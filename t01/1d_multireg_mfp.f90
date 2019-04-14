@@ -12,15 +12,16 @@ program shield_1d
 implicit none
 
     ! Geometry parameters
-    integer, parameter :: nreg = 6                              ! number of region in the 1D shield
+    integer, parameter :: nreg = 6                ! number of region in the 1D shield
     real, dimension(nreg) :: xthick = 1.0         ! thickness of the 1D shield (cm)
-    real, dimension(nreg+1) :: xbounds = 0.0                    ! boundaries of the shield regions (cm)
+    real, dimension(nreg+1) :: xbounds = 0.0      ! boundaries of the shield regions (cm)
 
     ! Transport parameters
     real, parameter :: c = 0.5 ! Case 1
     ! real, parameter :: c = 0.7 ! Case 2
     ! real, parameter :: c = 0.9 ! Case 3
     real, parameter :: sigma_tin = 1.0
+    real, dimension(nreg) :: bm         ! Allocate the number of the mean-free-paths
     real, dimension(nreg) :: sigma_t    ! Total interaction cross section (cm-1)
     real, dimension(nreg) :: sigma_s    ! Scattering cross section (cm-1)
     real, dimension(nreg) :: sigma_a    ! Absorption cross section (cm-1)
@@ -35,7 +36,7 @@ implicit none
     real :: x, u, wt
 
     ! Simulation parameters
-    integer, parameter :: nhist = 100000
+    integer, parameter :: nhist = 10000000
 
     ! Scoring variables
     real, dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflection
@@ -45,7 +46,7 @@ implicit none
     integer :: i, ihist 
     logical :: pdisc    ! flag to discard a particle
     integer :: irnew    ! index of new region 
-    real :: pstep       ! distance to next interaction 
+    real :: pstep, b    ! distance to next interaction 
     real :: dist        ! distance to boundary along particle direction
     real :: rnno 
     real :: start_time, end_time
@@ -56,17 +57,19 @@ implicit none
     call rng_init(20180815)
 
     ! Print some info to console
-    write(*,'(A, I15)') 'Number of histories : ', nhist
+    write(*,'(A, I15)') 'Number of histories COÑÑOOOOOOOOOOOO: ', nhist
 
     do i = 1,nreg
         if(i == 1) then
             sigma_t(i) = sigma_tin
             sigma_s(i) = c*sigma_t(i)
             sigma_a(i) = sigma_t(i) - sigma_s(i)
+            bm(i) = sigma_t(i)*xthick(i)
         else
             sigma_t(i) = sigma_t(i-1) - 0.1
             sigma_s(i) = c*sigma_t(i)
             sigma_a(i) = sigma_t(i) - sigma_s(i)
+            bm(i) = bm(i-1) + sigma_t(i)*xthick(i)
         endif
 
         write(*,'(A, I5, A)') 'For region ', i, ':'
@@ -74,6 +77,8 @@ implicit none
         write(*,'(A, F15.5)') 'Absoption interaction cross-section (cm-1): ', sigma_a(i)
         write(*,'(A, F15.5)') 'Scattering interaction cross-section (cm-1): ', sigma_s(i)
         write(*,'(A, F15.5)') '1D shield thickness (cm): ', xthick(i)
+        write(*,'(A, F15.5)') 'b (): ', bm(i)
+
     enddo
    
     ! Initialize simulation geometry.
@@ -99,51 +104,104 @@ implicit none
         ! Enter transport process
         particle_loop: do
             
-            ptrans_loop: do
+            pmfp_loop: do
 
                 ! Distance to the next interaction.
-                if(ir == 0 .or. ir == nreg+1) then
-                    ! Vacuum step
-                    pstep = 1.0E8
+                b = bk()
+
+                if(u .gt. 0.0) then
+                    bm_loop: do i = 1,(nreg-1)
+                        if(b <= bm(1)) then
+                            ir = 1
+                            pstep = mfp(sigma_t(1),b,bm(1))
+                            exit
+                        else if(bm(i) < b .and. b <= bm(i+1)) then
+                            ir = i+1
+                            pstep = mfp(sigma_t(ir),b,bm(ir))
+                            exit
+                        else
+                            ir = nreg+1
+                            ! Vacuum step
+                            pstep = 1.0E8
+                            ! The particle is leaving the geometry, discard it.
+                            pdisc = .true.
+                            exit
+                        endif
+                    enddo bm_loop 
                 else
-                    pstep = pl(sigma_t(ir))
+                    ! bm_loop: do i = irnew,1
+                    !     if(b <= bm(irnew)) then
+                    !         ! ir = irnew
+                    !         pstep = mfp(sigma_t(irnew),b,bm(irnew))
+                    !         exit
+                    !     elseif(bm(i) < b .and. b <= bm(i+1))
+                    !         ir = i+1
+                    !         pstep = mfp(sigma_t(ir),b,bm(ir))
+                    !         exit
+                    !     else
+                    !         ir = nreg+1
+                    !         ! Vacuum step
+                    !         pstep = 1.0E8
+                    !         ! The particle is leaving the geometry, discard it.
+                    !         pdisc = .true.
+                    !         exit
+                    !     endif
+                    ! enddo bm_loop
+                    pstep = mfp(sigma_t(irnew),b,bm(irnew))
+
+                    if(x >= pstep) then
+                        ir = irnew
+                        x = x + pstep*u
+                    else
+                        ir = 0
+                        ! Vacuum step
+                        pstep = 1.0E8
+                        ! The particle is leaving the geometry, discard it.
+                        pdisc = .true.
+                    endif
                 endif
+                ! if(ir == 0 .or. ir == nreg+1) then
+                !     ! Vacuum step
+                !     pstep = 1.0E8
+                ! else
+                !     pstep = mfp(sigma_t(ir),b,bm(ir-1))
+                ! endif
 
                 ! Save particle current region.
                 irnew = ir
 
                 ! Check expected particle step with geometry.
-                if(u .lt. 0.0) then
-                    if(irnew == 0) then
-                        ! The particle is leaving the geometry, discard it.
-                        pdisc = .true.
-                    else
-                        ! The particle goes to the front face of the shield.
-                        dist = (xbounds(ir) - x)/u
+                ! if(u .lt. 0.0) then
+                !     if(irnew == 0) then
+                !         ! The particle is leaving the geometry, discard it.
+                !         pdisc = .true.
+                !     else
+                !         ! The particle goes to the front face of the shield.
+                !         dist = (xbounds(ir) - x)/u
 
-                        ! Now check if the particle leaves current region.
-                        if(dist < pstep) then
-                        pstep = dist                      
-                        irnew = irnew - 1
-                        endif
-                    endif
+                !         ! Now check if the particle leaves current region.
+                !         if(dist < pstep) then
+                !         pstep = dist                      
+                !         irnew = irnew - 1
+                !         endif
+                !     endif
                     
-                else if(u .gt. 0.0) then
-                    if(irnew == nreg+1) then
-                        ! The particle is leaving the geometry, discard it.
-                        pdisc = .true.
-                    else
-                        ! The particle goes to the back face of the shield.
-                        dist = (xbounds(ir+1) - x)/u
+                ! else if(u .gt. 0.0) then
+                !     if(irnew == nreg+1) then
+                !         ! The particle is leaving the geometry, discard it.
+                !         pdisc = .true.
+                !     else
+                !         ! The particle goes to the back face of the shield.
+                !         dist = (xbounds(ir+1) - x)/u
 
-                        ! Now check if the particle leaves current region.
-                        if(dist < pstep) then
-                            pstep = dist
-                            irnew = irnew + 1
-                        endif
-                    endif
+                !         ! Now check if the particle leaves current region.
+                !         if(dist < pstep) then
+                !             pstep = dist
+                !             irnew = irnew + 1
+                !         endif
+                !     endif
                     
-                endif
+                ! endif
 
                 ! Check if particle has been discarded.
                 if(pdisc .eqv. .true.) then
@@ -152,7 +210,7 @@ implicit none
 
                 ! Update position of particle.
                 x = x + pstep*u
-
+                
                 ! Reached this point, if the particle has not changed region, it must interact.
                 if(ir == irnew) then
                     exit
@@ -161,7 +219,7 @@ implicit none
                     ir = irnew
                 endif
 
-            enddo ptrans_loop    
+            enddo pmfp_loop    
             
             if(pdisc .eqv. .true.) then
                 ! The particle has been discarded. Score it and end tracking.

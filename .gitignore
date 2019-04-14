@@ -1,0 +1,9 @@
+*.3ddose
+*.vscode
+*.dSYM
+.DS_Store
+*.agr
+*.exe
+*.ilk
+*.pdb
+*.mod
