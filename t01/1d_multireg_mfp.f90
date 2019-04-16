@@ -183,31 +183,32 @@ implicit none
             else
                 ! The particle was scattered, get new direction to re-enter transport loop.
                 u = scatt(u)
-                if(u .gt. 0.0) then
-                    bm = 0.0
+                bm = bm_calc(u, nreg, ir, xthick, x, sigma_t)
+                ! if(u .gt. 0.0) then
+                !     bm = 0.0
 
-                    if(ir == nreg) then
-                        bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
-                    else
-                        bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
+                !     if(ir == nreg) then
+                !         bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
+                !     else
+                !         bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
 
-                        bm_recalc_xpos: do i = (ir+1),nreg
-                            bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
-                        enddo bm_recalc_xpos
-                    endif
-                else
-                    bm = 0.0                
+                !         bm_recalc_xpos: do i = (ir+1),nreg
+                !             bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
+                !         enddo bm_recalc_xpos
+                !     endif
+                ! else
+                !     bm = 0.0                
 
-                    if(ir == 1) then
-                        bm(ir) = sigma_t(ir)*x
-                    else
-                        bm(ir) = sigma_t(ir)*(x-(sum(xthick(1:(ir-1)))))
+                !     if(ir == 1) then
+                !         bm(ir) = sigma_t(ir)*x
+                !     else
+                !         bm(ir) = sigma_t(ir)*(x-(sum(xthick(1:(ir-1)))))
                         
-                        bm_recalc_xneg: do i = (ir-1),1
-                            bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
-                        enddo bm_recalc_xneg
-                    endif
-                endif
+                !         bm_recalc_xneg: do i = (ir-1),1
+                !             bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
+                !         enddo bm_recalc_xneg
+                !     endif
+                ! endif
             endif
             
         enddo particle_loop
