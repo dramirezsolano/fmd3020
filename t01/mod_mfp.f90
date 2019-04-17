@@ -57,7 +57,7 @@ contains
         real, dimension(nreg) :: bm_calc
 
         if(u .gt. 0.0) then
-            bm = 0.0
+            ! bm = 0.0
 
             if(ir == nreg) then
                 bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
@@ -68,8 +68,8 @@ contains
                     bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
                 enddo bm_recalc_xpos
             endif
-        else
-            bm = 0.0                
+        else if(u .lt. 0.0) then
+            ! bm = 0.0                
 
             if(ir == 1) then
                 bm(ir) = sigma_t(ir)*x
