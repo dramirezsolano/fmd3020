@@ -12,8 +12,8 @@ program shield_1d
 implicit none
 
     ! Geometry parameters
-    integer, parameter :: nreg = 6                ! number of region in the 1D shield
-    real, dimension(nreg) :: xthick = 1.0         ! thickness of the 1D shield (cm)
+    integer, parameter :: nreg = 6           ! number of region in the 1D shield
+    real, dimension(nreg) :: xthick = 1.0    ! thickness of the 1D shield (cm)
     real, dimension(2) :: xbounds = 0.0      ! boundaries of the shield regions (cm)
 
     ! Transport parameters
