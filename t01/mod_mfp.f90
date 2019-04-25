@@ -1,6 +1,10 @@
 module mod_mfp
     !
-    ! This module handles the calculation of the distance to the next interaction.
+    ! El modulo contiene dos metodos de transporte: vuelo libre (pl) y numero de 
+    ! caminos libres medio (mfp). Ademas, contiene el calculo del parametro b y bm,
+    ! requeridos para el metodo mfp.
+    !
+    ! Modulo basado en (Doerner, 2019)
     !
     use mod_rng
 
@@ -8,7 +12,7 @@ implicit none
 
 contains
 
-    real function pl(sigma)
+    real function pl(sigma) ! (Doerner, 2019)
         !
         ! This function samples the free flight, the path length of the particle 
         ! before suffering an interaction. The analytical inversion method is implemented.
@@ -23,24 +27,21 @@ contains
 
     real function mfp(sigma,bj,bm)
         !
-        ! This function samples the number of the mean-free-paths (mfp), the path length of the particle 
-        ! before suffering an interaction. The analytical inversion method is implemented.
+        ! Funcion que muestrea el metodo mfp. (Haghighat, 2014)
         !
-        real, intent(in) :: sigma ! total interaction cross-section (cm-1)
-        real, intent(in) :: bj
-        real, intent(in) :: bm
-        ! real :: rnno
+        real, intent(in) :: sigma  ! total interaction cross-section (cm-1)
+        real, intent(in) :: bj     ! Parametro b = -log(1-rnno)
+        real, intent(in) :: bm     ! Parametros bm para cada region. bm = sum(sigma(i)*r(i))
 
-        ! rnno = rng_set()
-        ! mfp = -(log(1.0-rnno)+bm)/sigma
         mfp = (bj-bm)/sigma
-        ! write(*,'(A,F15.5)') 'mfp : ', mfp
         
     end function mfp
 
     real function bk()
-        ! hjj
-        real :: rnno
+        ! 
+        ! Funcion que calcula el parametro b para cada transporte
+        !
+        real :: rnno ! numero aleatorio
 
         rnno = rng_set()
         bk = -log(1.0-rnno)
@@ -48,19 +49,25 @@ contains
     end function bk
 
     function bm_calc(u, nreg, ir, xbound, x, sigma_t)
+        !
+        ! Funcion que calcula el parametro bm para cada region
+        !
 
+        ! Parametros de la geometria
         integer, intent(in) :: nreg, ir
         real, dimension(nreg), intent(in) :: xbound, sigma_t
         real, intent(in) :: u, x
 
         integer i
-        real, dimension(nreg) :: r
-        real, dimension(0:nreg+1) :: bm
-        real, dimension(0:nreg+1) :: bm_calc
+        real, dimension(nreg) :: r           ! Longitud de trayectoria en cada region en la direccion de movimiento
+        real, dimension(0:nreg+1) :: bm      ! vector que almacena los bm calculados
+        real, dimension(0:nreg+1) :: bm_calc ! salida de la funcion como vector
 
+        ! Calculo en direccion positiva
         if(u .gt. 0.0) then
             bm = 0.0
 
+            ! Calculo de longitud de trayectoria
             if(ir == nreg) then
                 r(ir) = (xbound(ir+1)-x)/u
             else
@@ -69,6 +76,8 @@ contains
                     r(i) = (xbound(i+1)-x)/u
                 enddo r_recalc_xpos
             endif
+            
+            ! Calculo de los bm
             if(ir == nreg) then
                 bm(ir) = sigma_t(ir)*r(ir)
             else
@@ -78,23 +87,21 @@ contains
                 enddo bm_recalc_xpos
             endif
 
+        ! Calculo en direccion negativa
         else if(u .lt. 0.0) then
             bm = 0.0
 
+            ! Calculo de longitud de trayectoria
             if(ir == 1) then
                 r(ir) = (xbound(ir)-(x))/u
-                ! r(ir) = (x)/u
             else
                 r(ir) = (xbound(ir)-(x))/u
-                ! r(ir) = (x)/u
-                ! write(*,'(A, F15.5)') 'r ir:', r(ir)
                 r_recalc_xneg: do i = (ir-1),1,-1
                     r(i) = (xbound(i)-(x))/u
-                    ! r(i) = (x)/u
-                    ! write(*,'(A, F15.5)') 'r :', r(i)
                 enddo r_recalc_xneg
             endif
-            ! r = -r
+
+            ! Calculo de los bm
             if(ir == 1) then
                 bm(ir) = sigma_t(ir)*r(ir)
             else
@@ -103,46 +110,9 @@ contains
                     bm(i) = sigma_t(i)*(r(i)-r(i+1)) + bm(i+1)
                 enddo bm_recalc_xneg
             endif
-            ! do i = 1,ir
-                ! write(*,'(A, F15.5)') 'bm_pos (): ', bm_pos(i)
-                ! write(*,'(A, F15.5)') 'bm (): ', bm(i)
-            ! enddo
         endif
 
-        ! if(u .gt. 0.0) then
-        !     bm = 0.0
-        !     ! bm(1) = sigma_t(1)*xthick(1)                
-        !     ! bm_recalc_xpos: do i = 2,nreg
-        !     !     bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
-        !     ! enddo bm_recalc_xpos
-        !     if(ir == nreg) then
-        !         bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
-        !     else
-        !         bm(ir) = sigma_t(ir)*((sum(xthick(1:ir)))-x)
-
-        !         bm_recalc_xpos: do i = (ir+1),nreg
-        !             bm(i) = sigma_t(i)*xthick(i) + bm(i-1)
-        !         enddo bm_recalc_xpos
-        !     endif
-        ! else if(u .lt. 0.0) then
-        !     bm = 0.0
-        !     ! bm(nreg) = sigma_t(nreg)*xthick(nreg)                
-        !     ! bm_recalc_xneg: do i = (nreg-1),1
-        !     !     bm(i) = sigma_t(i)*xthick(i) + bm(i+1)
-        !     ! enddo bm_recalc_xneg
-        !     if(ir == 1) then
-        !         bm(ir) = sigma_t(ir)*x
-        !     else
-        !         bm(ir) = sigma_t(ir)*(x-(sum(xthick(1:(ir-1)))))
-                
-        !         bm_recalc_xneg: do i = (ir-1),1
-        !             bm(i) = sigma_t(i)*xthick(i) + bm(i+1)
-        !         enddo bm_recalc_xneg
-        !     endif
-        ! endif
-        ! do i = 1,nreg
-        !     write(*,'(F15.5)') bm_calc
-        ! enddo
+        ! Retorno de los valores de bm
         bm_calc = bm
 
     end function bm_calc
