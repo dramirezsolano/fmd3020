@@ -17,9 +17,9 @@ implicit none
     real, dimension(nreg+1) :: xbounds = 0.0                    ! boundaries of the shield regions (cm)
 
     ! Transport parameters
-    real, parameter :: c = 0.5 ! Case 1
-    ! real, parameter :: c = 0.7 ! Case 2
-    ! real, parameter :: c = 0.9 ! Case 3
+    !real, parameter :: c = 0.5 ! Case 1
+    !real, parameter :: c = 0.7 ! Case 2
+    real, parameter :: c = 0.9 ! Case 3
     real, parameter :: sigma_tin = 1.0
     real, dimension(nreg) :: sigma_t    ! Total interaction cross section (cm-1)
     real, dimension(nreg) :: sigma_s    ! Scattering cross section (cm-1)
@@ -35,7 +35,7 @@ implicit none
     real :: x, u, wt
 
     ! Simulation parameters
-    integer, parameter :: nhist = 100000000
+    integer, parameter :: nhist = 5
 
     ! Scoring variables
     real, dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflection
@@ -56,7 +56,7 @@ implicit none
     call rng_init(20180815)
 
     ! Print some info to console
-    write(*,'(A, I15)') 'Number of histories : ', nhist
+    write(*,'(A, I15)') 'Number of histories ssd: ', nhist
 
     do i = 1,nreg
         if(i == 1) then
