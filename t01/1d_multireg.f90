@@ -21,6 +21,7 @@ program shield_1d
     real, dimension(nreg+1) :: xbounds = 0.0      ! bordes de cada region (cm)
 
     ! Parametros de transporte
+    ! Descomentar el caso de interes
     ! real, parameter :: c = 0.5 ! Caso 1
     ! real, parameter :: c = 0.7 ! Caso 2
     real, parameter :: c = 0.9 ! Caso 3
@@ -41,9 +42,10 @@ program shield_1d
     real :: x, u, wt
 
     ! Parametros de la simulacion
-    integer, parameter :: nhist = 100000    ! numero de historias
-    character (len = 10) :: mode = 'pl'              ! metodo de transporte
-    ! character (len = 10) :: mode = 'mfp'              ! metodo de transporte
+    integer, parameter :: nhist = 10000000    ! numero de historias
+    ! Descomentar el metodo de transporte de interes
+    ! character (len = 10) :: mode = 'pl'              ! metodo de transporte
+    character (len = 10) :: mode = 'mfp'              ! metodo de transporte
 
     ! Scoring variables
     real, dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
