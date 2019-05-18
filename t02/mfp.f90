@@ -14,20 +14,24 @@ program mfp_sampling
     integer, parameter :: ncase = 9
     
     ! Caso a)
-    integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
-    integer, dimension(ncase) :: nbatch = 1000/nperbatch   ! number of statistical batches
+    ! integer, dimension(ncase) :: nhist = 1000
+    ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    ! integer, dimension(ncase) :: nbatch = 1000/nperbatch   ! number of statistical batches
     
     ! Caso b)
     ! integer, parameter, dimension(ncase) :: nperbatch = 10
     ! integer, parameter, dimension(ncase) :: nbatch = [10, 20, 30, 40, 50, 100, 200, 400, 500]   ! number of statistical batches
+    ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
         
     ! Caso c)
     ! integer, parameter, dimension(ncase) :: nbatch = 10   ! number of statistical batches
     ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
     
     ! Caso d)
-    ! integer, parameter, dimension(ncase) :: nbatch = 20   ! number of statistical batches
-    ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    integer, parameter, dimension(ncase) :: nbatch = 20   ! number of statistical batches
+    integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    integer, dimension(ncase) :: nhist = nbatch*nperbatch
 
     ! Geometry parameters
     real :: sigma = 2.0   ! total interaction cross section (cm-1)
@@ -92,10 +96,11 @@ program mfp_sampling
     enddo ncase_loop
 
     ! Save results to file
-    open(unit=1, file='mfp_sampling_case_a.txt')
+    open(unit=1, file='mfp_sampling_case_d.txt')
+    write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', 'var '
     do icase = 1,ncase
         desv = sqrt(var(icase))
-        write(unit=1, fmt='(I5, I5, F10.5, F10.5, F10.5)') nperbatch(icase), nbatch(icase), mean(icase), var(icase), desv        
+        write(unit=1, fmt='(I5, I5, I5, F10.5, F10.5)') nhist(icase), nperbatch(icase), nbatch(icase), mean(icase), var(icase)        
     enddo
     close(1)
 
