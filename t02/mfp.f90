@@ -14,9 +14,9 @@ program mfp_sampling
     integer, parameter :: ncase = 9
     
     ! Caso a)
-    ! integer, dimension(ncase) :: nhist = 1000
-    ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
-    ! integer, dimension(ncase) :: nbatch = 1000/nperbatch   ! number of statistical batches
+    integer, dimension(ncase) :: nhist = 1000
+    integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    integer, dimension(ncase) :: nbatch = 1000/nperbatch   ! number of statistical batches
     
     ! Caso b)
     ! integer, parameter, dimension(ncase) :: nperbatch = 10
@@ -29,19 +29,21 @@ program mfp_sampling
     ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
     
     ! Caso d)
-    integer, parameter, dimension(ncase) :: nbatch = 20   ! number of statistical batches
-    integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
-    integer, dimension(ncase) :: nhist = nbatch*nperbatch
+    ! integer, parameter, dimension(ncase) :: nbatch = 20   ! number of statistical batches
+    ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
+    ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
 
     ! Geometry parameters
     real :: sigma = 2.0   ! total interaction cross section (cm-1)
 
     integer :: icase, ibatch, isample
-    real :: path, score, score2, desv           ! auxiliary variables used for scoring
+    real :: path, score, score2, desv, r, fom           ! auxiliary variables used for scoring
     real, allocatable :: step(:)    ! distance to next interaction (cm)
     real, allocatable :: step2(:)   ! distance to next interaction (squared)
     real, allocatable :: mean(:)    ! distance to next interaction (cm)
     real, allocatable :: var(:)   ! distance to next interaction (squared)
+    real, dimension(ncase) :: start_time
+    real, dimension(ncase) :: end_time
 
     ! Initialize the PRNG
     call rng_init(20180815)
@@ -53,10 +55,6 @@ program mfp_sampling
     allocate(mean(size(nperbatch)))
     allocate(var(size(nperbatch)))
 
-    ! do icase = 1,ncase
-    !     write(unit=6, fmt='(I5)') nbatch(icase)       
-    ! enddo
-
     step = 0.0
     step2 = 0.0
     mean = 0.0
@@ -65,6 +63,7 @@ program mfp_sampling
     ! Start the sampling process. We calculate the mean and variance of the sample for 
     ! each nperbatch value given by the user.
     ncase_loop: do icase = 1,ncase
+        call cpu_time(start_time(icase))
             
         ! Proceed with the sampling process. Start the batch loop
         batch_loop: do ibatch = 1,nbatch(icase)   
@@ -84,24 +83,35 @@ program mfp_sampling
             ! Accumulate results and proceed to next batch.
             step(icase) = step(icase) + score
             step2(icase) = step2(icase) + score2
+            ! step2(icase) = step2(icase) + (score/nperbatch(icase))**2
             
         enddo batch_loop
 
         ! Statistical analysis.
         mean(icase) = step(icase)/(nbatch(icase)*nperbatch(icase))
-        var(icase) = (step2(icase) - (nbatch(icase)*nperbatch(icase))*mean(icase)**2)/(((nbatch(icase)*nperbatch(icase))-1))
+        var(icase) = (step2(icase) - ((nbatch(icase)*nperbatch(icase))*mean(icase)**2))/((nbatch(icase)*nperbatch(icase))-1)
+        ! var(icase) = (step2(icase) - (nbatch*nperbatch(icase))*step(icase)**2)/(((nbatch*nperbatch(icase))-1))
 
-        write(unit=6, fmt='(I2, I5, I5, F10.5, F10.5)') icase, nperbatch(icase), nbatch(icase), mean(icase), var(icase)
+        write(unit=6, fmt='(I2, I5, I5, F10.5, F13.8)') icase, nperbatch(icase), nbatch(icase), mean(icase), var(icase)
+
+        call cpu_time(end_time(icase))
 
     enddo ncase_loop
 
     ! Save results to file
-    open(unit=1, file='mfp_sampling_case_d.txt')
-    write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', 'var '
+    open(unit=1, file='mfp_sampling_case_a.txt')
+    write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', '   var verd ', '  var prom', '    DS', '        R', &
+            '         FOM', '        time'
     do icase = 1,ncase
-        desv = sqrt(var(icase))
-        write(unit=1, fmt='(I5, I5, I5, F10.5, F10.5)') nhist(icase), nperbatch(icase), nbatch(icase), mean(icase), var(icase)        
+        desv = sqrt(var(icase)/nperbatch(icase))
+        r = sqrt(var(icase))/(mean(icase)*sqrt(nperbatch(icase)+0.0))
+        fom = 1/((r**2)*(end_time(icase)-start_time(icase)))
+
+        write(unit=1, fmt='(I5, I5, I5, F10.5, F10.5, F10.5, F10.5, F10.5, F13.2, F10.5)') &
+             nhist(icase), nperbatch(icase), nbatch(icase), mean(icase), var(icase), var(icase)/nperbatch(icase), &
+             desv, r, fom, (end_time(icase)-start_time(icase))         
     enddo
+
     close(1)
 
 end program mfp_sampling
