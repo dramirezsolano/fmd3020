@@ -1,57 +1,68 @@
 program mfp_sampling
     !
-    ! Program that samples the free flight, i.e. distance to the next interaction. and estimates its 
-    ! mean value and variance for different number of histories.
+    ! Programa que muestrea la longitud de camino que recorre un partícula en un medio
+    ! empleando el método de vuelo libre. Además estima el valor medio (promedio) y la varianza 
+    ! para diferentes combinaciones entre número de lotes estadísticos e historias por lote.
     !
-    ! Author: Edgardo Doerner, edoerner@fis.puc.cl
+    ! mod_rng.f90 y mod_mfp.f90 no sufrieron modificaciones. Ambos son de (Doerner, 2019)
+    !
+    ! Para compilar ejecute: gfortran mfp.f90 mod_rng.f90 mod_mfp.f90 -o mfp.exe
+    ! Para correr ejecute: ./mfp.exe
+    !
+    ! Autores: Jessica Hernández
+    !          Daniel Ramirez
+    !
+    ! Basado en (Doerner, 2019)
     !
     use mod_rng
     use mod_mfp
 
     implicit none
 
-    ! Transport parameters
+    ! Número de casos
     integer, parameter :: ncase = 9
+
+    ! Diferentes combinaciones entre número de historias por lote, y cantidad de lotes estadísticos.
+    ! Descomente la combinación de interés y comente la que no desea ejecutar.
     
-    ! Caso a)
+    ! Combinación a)
     integer, dimension(ncase) :: nhist = 1000
     integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
     integer, dimension(ncase) :: nbatch = 1000/nperbatch   ! number of statistical batches
     
-    ! Caso b)
-    ! integer, parameter, dimension(ncase) :: nperbatch = 10
-    ! integer, parameter, dimension(ncase) :: nbatch = [10, 20, 30, 40, 50, 100, 200, 400, 500]   ! number of statistical batches
-    ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
+    ! Combinación b)
+    ! integer, parameter, dimension(ncase) :: nperbatch = 10    ! Número de historias por lote
+    ! integer, parameter, dimension(ncase) :: nbatch = [10, 20, 30, 40, 50, 100, 200, 400, 500]   ! Número de lotes estadísticos
+    ! integer, dimension(ncase) :: nhist = nbatch*nperbatch     ! Número de historias total
         
-    ! Caso c)
-    ! integer, parameter, dimension(ncase) :: nbatch = 10   ! number of statistical batches
+    ! Combinación c)
+    ! integer, parameter, dimension(ncase) :: nbatch = 10 
     ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
     ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
     
-    ! Caso d)
-    ! integer, parameter, dimension(ncase) :: nbatch = 20   ! number of statistical batches
+    ! Combinación d)
+    ! integer, parameter, dimension(ncase) :: nbatch = 20
     ! integer, parameter, dimension(ncase) :: nperbatch = [1, 2, 5, 10, 25, 50, 100, 200, 500]
     ! integer, dimension(ncase) :: nhist = nbatch*nperbatch
 
-    ! Geometry parameters
-    real :: sigma = 2.0   ! total interaction cross section (cm-1)
+    ! Parámetros geométricos
+    real :: sigma = 2.0   ! Sección eficaz total de interacción (cm-1)
 
     integer :: icase, ibatch, isample
-    real :: path, score, score2, desv, r, fom           ! auxiliary variables used for scoring
-    real, allocatable :: step(:)    ! distance to next interaction (cm)
-    real, allocatable :: step2(:)   ! distance to next interaction (squared)
-    real, allocatable :: mean(:)    ! distance to next interaction (cm)
-    real, allocatable :: var(:)   ! distance to next interaction (squared)
+    real :: path, score, score2, desv, r, fom     ! Variables auxiliares
+    real, allocatable :: step(:)    ! Distancia a la siguiente interacción (cm)
+    real, allocatable :: step2(:)   ! Distancia a la siguiente interaccion (al cuadrado)
+    real, allocatable :: mean(:)    ! Arreglo para almacenar el promedio
+    real, allocatable :: var(:)     ! Arreglo para almacenar la varianza
     real, dimension(ncase) :: start_time
     real, dimension(ncase) :: end_time
 
-    ! Initialize the PRNG
+    ! Inicializa PRNG
     call rng_init(20180815)
 
-    ! Allocate the arrays that will hold the samples.
+    ! Almacena las distancias, promedios y varianzas.
     allocate(step(size(nperbatch)))
     allocate(step2(size(nperbatch)))
-    ! Allocate the arrays that will hold the mean and var.
     allocate(mean(size(nperbatch)))
     allocate(var(size(nperbatch)))
 
@@ -60,49 +71,50 @@ program mfp_sampling
     mean = 0.0
     var = 0.0
 
-    ! Start the sampling process. We calculate the mean and variance of the sample for 
-    ! each nperbatch value given by the user.
+    ! Inicia el proceso de muestreo. Se calcula el promedio y varianza para caso 
     ncase_loop: do icase = 1,ncase
+
+        ! Tiempo de inicio para cada caso
         call cpu_time(start_time(icase))
             
-        ! Proceed with the sampling process. Start the batch loop
+        ! Inicia proceso de muestreo para cada lote estadístico
         batch_loop: do ibatch = 1,nbatch(icase)   
 
-            ! Initialize scoring variable
+            ! Inicializa variables de conteo
             score = 0.0
             score2 = 0.0
             
             sampling_loop: do isample = 1,nperbatch(icase)
-                ! Sampling process. Accumulate the sample and its squared value.
+                ! Proceso de muestreo. Se almacena el valor y su cuadrado.
                 path = mfp(sigma)
                 score = score + path
                 score2 = score2 + path**2
                 
             enddo sampling_loop
 
-            ! Accumulate results and proceed to next batch.
+            ! Valores acumulados por lote
             step(icase) = step(icase) + score
             step2(icase) = step2(icase) + score2
-            ! step2(icase) = step2(icase) + (score/nperbatch(icase))**2
             
         enddo batch_loop
 
-        ! Statistical analysis.
+        ! Análisis estadístico
         mean(icase) = step(icase)/(nbatch(icase)*nperbatch(icase))
         var(icase) = (step2(icase) - ((nbatch(icase)*nperbatch(icase))*mean(icase)**2))/((nbatch(icase)*nperbatch(icase))-1)
-        ! var(icase) = (step2(icase) - (nbatch*nperbatch(icase))*step(icase)**2)/(((nbatch*nperbatch(icase))-1))
 
+        ! Variables a mostrar en pantalla
         write(unit=6, fmt='(I2, I5, I5, F10.5, F13.8)') icase, nperbatch(icase), nbatch(icase), mean(icase), var(icase)
 
         call cpu_time(end_time(icase))
 
     enddo ncase_loop
 
-    ! Save results to file
+    ! Salvando los resultados en un archivo
     open(unit=1, file='mfp_sampling_case_a.txt')
     write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', '   var verd ', '  var prom', '    DS', '        R', &
             '         FOM', '        time'
     do icase = 1,ncase
+        ! Cálculo de la desviación estándar, varianza relativa y FOM
         desv = sqrt(var(icase)/nperbatch(icase))
         r = sqrt(var(icase))/(mean(icase)*sqrt(nperbatch(icase)+0.0))
         fom = 1/((r**2)*(end_time(icase)-start_time(icase)))
