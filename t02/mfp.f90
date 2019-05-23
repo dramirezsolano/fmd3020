@@ -114,7 +114,7 @@ program mfp_sampling
     write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', '   var verd ', '  var prom', '    DS', '        R', &
             '         FOM', '        time'
     do icase = 1,ncase
-        ! Cálculo de la desviación estándar, varianza relativa y FOM
+        ! Cálculo de la desviación estándar, incertidumbre relativa y FOM
         desv = sqrt(var(icase)/nperbatch(icase))
         r = sqrt(var(icase))/(mean(icase)*sqrt(nperbatch(icase)+0.0))
         fom = 1/((r**2)*(end_time(icase)-start_time(icase)))
