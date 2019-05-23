@@ -109,8 +109,8 @@ program mfp_sampling
 
     enddo ncase_loop
 
-    ! Salvando los resultados en un archivo
-    open(unit=1, file='mfp_sampling_case_a.txt')
+    ! Salvando los resultados en un archivo. Cambie el nombre según corresponda
+    open(unit=1, file='mfp_sampling_case.txt')
     write(unit=1, fmt=*) 'nhist ', 'nperb ', 'batch ', 'mean ', '   var verd ', '  var prom', '    DS', '        R', &
             '         FOM', '        time'
     do icase = 1,ncase
