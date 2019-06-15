@@ -85,12 +85,12 @@ implicit none
     read(*,*) case
     if(case == 1) then
         ! Caso 1)
-        sigma_a = 1.8  ! Seccion eficaz de absorcion (cm-1)
-        sigma_s = 0.2  ! Seccion eficaz de dispersion (cm-1)
+        sigma_a = (/1.8, 1.8, 1.8, 1.8, 1.8/)  ! Seccion eficaz de absorcion (cm-1)
+        sigma_s = (/0.2, 0.2, 0.2, 0.2, 0.2/)  ! Seccion eficaz de dispersion (cm-1)
     else 
         ! Caso 2)
-        sigma_a = 1.2
-        sigma_s = 0.8
+        sigma_a = (/1.2, 1.2, 1.2, 1.2, 1.2/)
+        sigma_s = (/0.8, 0.8, 0.8, 0.8, 0.8/) 
     endif
 
     call cpu_time(start_time)
