@@ -6,9 +6,9 @@ program shield_1d
     ! 
     ! mod_rng.f90, mod_scatt.f90 y mod_mfp.f90 no sufrieron modificaciones. Ambos son de (Doerner, 2019)
     !
-    ! Para compilar ejecute: gfortran caso_a.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_a.exe
-    ! Para correr ejecute (Linux): ./caso_a.exe
-    !                     (Windows): caso_a.exe
+    ! Para compilar ejecute: gfortran caso_c.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_c.exe
+    ! Para correr ejecute (Linux): ./caso_c.exe
+    !                     (Windows): caso_c.exe
     !
     ! Autores: Jessica Hernández
     !          Daniel Ramirez
@@ -24,12 +24,12 @@ program shield_1d
 implicit none
 
     ! Parametros geometricos
-    integer(kind=int32), parameter :: nreg = 1              ! numero de regiones
-    real(kind=real64), dimension(nreg) :: xthick = (/5.0/)  ! grosor del atenuador 1D (cm)
+    integer(kind=int32), parameter :: nreg = 5              ! numero de regiones
+    real(kind=real64), dimension(nreg) :: xthick = 1.0  ! grosor del atenuador 1D (cm)
     real(kind=real64), dimension(nreg+1) :: xbounds = 0.0   ! fronteras de la region (cm)
 
     ! Parametros de transporte
-    real(kind=real64), dimension(nreg) :: sigma_t = (/2.0/)  ! sección eficaz total de interaccion (cm-1)
+    real(kind=real64), dimension(nreg) :: sigma_t = 2.0  ! sección eficaz total de interaccion (cm-1)
     real(kind=real64), dimension(nreg) :: sigma_a = 0.0      ! Seccion eficaz de absorcion (cm-1)
     real(kind=real64), dimension(nreg) :: sigma_s = 0.0      ! Seccion eficaz de dispersion (cm-1)
 
@@ -39,8 +39,17 @@ implicit none
     real(kind=real64), parameter :: wtin = 1.0   ! peso estadistico
     integer(kind=int32), parameter :: irin = 1   ! region inicial
 
-    integer(kind=int32) :: ir
-    real(kind=real64) :: x, u, wt
+    ! Now we introduce the concept of stack, therefore we expand each particle 
+    ! parameter to a size of the stack.
+    integer(kind=int32), parameter :: nstack = 100  ! maximum number of particles that can hold the stack
+    integer(kind=int32) :: np
+    integer(kind=int32), dimension(nstack) :: ir
+    real(kind=real64), dimension(nstack) :: x, u, wt
+
+    ! Geometrical splitting VRT parameters
+    real(kind=real64) :: gs_r = 2.63                ! ratio of region importances.
+    integer(kind=int32) :: gs_n                     ! integer part of gs_r
+    real(kind=real64), dimension(nreg) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
     integer(kind=int32), parameter :: nperbatch = 1E6           ! numero de historias por lote
@@ -76,12 +85,12 @@ implicit none
     read(*,*) case
     if(case == 1) then
         ! Caso 1)
-        sigma_a = (/1.8/)  ! Seccion eficaz de absorcion (cm-1)
-        sigma_s = (/0.2/)  ! Seccion eficaz de dispersion (cm-1)
+        sigma_a = 1.8  ! Seccion eficaz de absorcion (cm-1)
+        sigma_s = 0.2  ! Seccion eficaz de dispersion (cm-1)
     else 
         ! Caso 2)
-        sigma_a = (/1.2/)
-        sigma_s = (/0.8/) 
+        sigma_a = 1.2
+        sigma_s = 0.8
     endif
 
     call cpu_time(start_time)
@@ -109,11 +118,25 @@ implicit none
         xbounds(i+1) = xbounds(i) + xthick(i)
         write(*,'(F15.5)') xbounds(i+1)
     enddo
+
+    ! Inicializacion de los datos para la tecnica de Splitting Geometrico:
+    ! La importancia aumenta al aumentar el índice de la región para favorecer
+    ! la transmision
+    gs_i(1) = gs_r
+    do i = 2,nreg
+        gs_i(i) = gs_r*gs_i(i-1)            
+    enddo
+
+    write(*,'(A)') '(GS VRT ) Importances for each region:'
+    do i = 1,nreg        
+        write(*,'(A, I3, A, F15.5)') 'nreg = ', i, ', I = ', gs_i(i)
+    enddo
     
     ibatch_loop: do ibatch = 1,nbatch
         ihist_loop: do ihist = 1,nperbatch
             
             ! Inicializa la historia
+            np = 1
             x = xin
             u = uin
             wt = wtin
@@ -128,24 +151,24 @@ implicit none
                 ptrans_loop: do
 
                     ! Distancia a la siguiente interaccion
-                    if(ir == 0 .or. ir == nreg+1) then
+                    if(ir(np) == 0 .or. ir(np) == nreg+1) then
                         ! Vacuum step
                         pstep = 1.0E8
                     else
-                        pstep = mfp(sigma_t(ir))
+                        pstep = mfp(sigma_t(ir(np)))
                     endif
 
                     ! Guardar la region actual de la particula
-                    irnew = ir
+                    irnew = ir(np)
 
                     ! Chequear si la particula sigue en la geometria
-                    if(u .lt. 0.0) then
+                    if(u(np) .lt. 0.0) then
                         if(irnew == 0) then
                             ! Particula deja la geometria: se descarta
                             pdisc = .true.
                         else
                             ! La particula va a la cara frontal de la region
-                            dist = (xbounds(ir) - x)/u
+                            dist = (xbounds(ir(np)) - x(np))/u(np)
 
                             ! Chequea si la particula deja la region
                             if(dist < pstep) then
@@ -154,13 +177,13 @@ implicit none
                             endif
                         endif
                         
-                    else if(u .gt. 0.0) then
+                    else if(u(np) .gt. 0.0) then
                         if(irnew == nreg+1) then
                             ! Particula deja la geometria: se descarta
                             pdisc = .true.
                         else
                             ! La particula va a la cara posterior de la region
-                            dist = (xbounds(ir+1) - x)/u
+                            dist = (xbounds(ir(np)+1) - x(np))/u(np)
 
                             ! Chequea si la particula deja la region
                             if(dist < pstep) then
@@ -177,33 +200,78 @@ implicit none
                     endif
 
                     ! Transporte de la particula
-                    x = x + pstep*u
+                    x(np) = x(np) + pstep*u(np)
 
                     ! Si la particula no ha cambiado de region, interactua
-                    if(ir == irnew) then
+                    if(ir(np) == irnew) then
                         exit
                     else
-                        ! Actualizacion de la region de la particula
-                        ir = irnew
+                        ! GEOMETRICAL SPLITTING
+                        ! Implementation of geometrical splitting VRT.
+                        gs_r = gs_i(irnew)/gs_i(ir(np))
+
+                        if(gs_r > 1.0) then
+                            ! Particle is going to the ROI. Perform particle splitting.
+                            gs_n = floor(gs_r)
+                            rnno = rng_set()
+
+                            if(rnno .le. 1.0 - (gs_r - gs_n)) then
+                                ! Divide the particle in n particles
+
+                            else
+                                ! Divide the particle in n+1 particles
+
+                            endif
+                        else
+                            ! Particle is going backwards the ROI. Perform russian roulette.
+                            rnno = rng_set()
+                            if(rnno .gt. gs_r) then
+                                ! particle does not survive, finish particle
+                                np = np - 1
+                                cycle
+                            else
+                                ! particle survives, adjusts weight accordingly and continue transport.
+                                wt(np) = (1.0/gs_r)*wt(np)                        
+                            endif
+                        endif
+                        
+                        ! Update particle region index and continue transport process.
+                        ir(np) = irnew
                     endif
 
                 enddo ptrans_loop    
             
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
-                    score(ir) = score(ir) + wt
-                    exit
+                    score(ir(np)) = score(ir(np)) + wt(np)
+                    np = np - 1
+                    
+                    if(np .eq. 0) then
+                        ! Finish particle history.
+                        exit
+                    else
+                        ! Start transport of the next particle.
+                        cycle
+                    endif
                 endif
 
                 ! Determina el tipo de interaccion
                 rnno = rng_set()
-                if(rnno .le. sigma_a(ir)/sigma_t(ir)) then
+                if(rnno .le. sigma_a(ir(np))/sigma_t(ir(np))) then
                     ! Particula absorbida
-                    score(ir) = score(ir) + wt
-                    exit
+                    score(ir(np)) = score(ir(np)) + wt(np)
+                    np = np - 1
+
+                    if(np .eq. 0) then
+                        ! Finish particle history.
+                        exit
+                    else
+                        ! Start transport of the next particle.
+                        cycle
+                    endif
                 else
                     ! Particula dispersada, reingresa al loop de transporte con la nueva direccion
-                    u = scatt(u)
+                    u(np) = scatt(u(np))
                 endif
             
             enddo particle_loop
