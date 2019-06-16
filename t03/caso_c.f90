@@ -143,7 +143,7 @@ implicit none
             
             ! Definir flag de particula descartada
             pdisc = .false.
-            ! write(*,'(A, I15, A, I15)') 'Batch : ', ibatch, 'History index : ', ihist
+            ! write(*,'(A, I2, A, I2)') 'Batch : ', ibatch, ' History index : ', ihist
             ! Ingresa al proceso de transporte
             particle_loop: do
             
@@ -229,12 +229,12 @@ implicit none
                                 ! particle does not survive, finish particle
                                 np = np - 1
                                 
-                                if(np .le. 0) then
+                                if(np .eq. 0) then
                                     ! Finish particle history.
+                                    ! write(*,'(A, I15)') 'np ptrans_loop : ', np
                                     exit
                                 else
                                     ! Start transport of the next particle.
-                                    ! write(*,'(A, I15)') 'np : ', np
                                     cycle
                                 endif
                             else
@@ -247,15 +247,20 @@ implicit none
                         ir(np) = irnew
                     endif
 
-                enddo ptrans_loop    
-            
+                enddo ptrans_loop 
+                
+                if (np == 0) then 
+                    exit
+                endif
+
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
                     score(ir(np)) = score(ir(np)) + wt(np)
                     np = np - 1
                     
-                    if(np .le. 0) then
+                    if(np .eq. 0) then
                         ! Finish particle history.
+                        ! write(*,'(A, I15)') 'np fuera : ', np
                         exit
                     else
                         ! Start transport of the next particle.
@@ -271,12 +276,11 @@ implicit none
                     score(ir(np)) = score(ir(np)) + wt(np)
                     np = np - 1
 
-                    if(np .le. 0) then
+                    if(np .eq. 0) then
                         ! Finish particle history.
                         exit
                     else
                         ! Start transport of the next particle.
-                        ! write(*,'(A, I15)') 'np : ', np
                         cycle
                     endif
                 else
