@@ -24,14 +24,15 @@ program shield_1d
 implicit none
 
     ! Parametros geometricos
-    integer(kind=int32), parameter :: nreg = 5              ! numero de regiones
-    real(kind=real64), dimension(nreg) :: xthick = 1.0  ! grosor del atenuador 1D (cm)
-    real(kind=real64), dimension(nreg+1) :: xbounds = 0.0   ! fronteras de la region (cm)
+    integer(kind=int32), parameter :: nreg_o = 1          ! numero de regiones
+    integer(kind=int32), parameter :: nreg = 5            ! numero de subregiones
+    real(kind=real64), dimension(nreg) :: xthick = 1.0    ! grosor del atenuador 1D (cm)
+    real(kind=real64), dimension(nreg+1) :: xbounds = 0.0 ! fronteras de la region (cm)
 
     ! Parametros de transporte
     real(kind=real64), dimension(nreg) :: sigma_t = 2.0  ! sección eficaz total de interaccion (cm-1)
-    real(kind=real64), dimension(nreg) :: sigma_a = 0.0      ! Seccion eficaz de absorcion (cm-1)
-    real(kind=real64), dimension(nreg) :: sigma_s = 0.0      ! Seccion eficaz de dispersion (cm-1)
+    real(kind=real64), dimension(nreg) :: sigma_a = 0.0  ! Seccion eficaz de absorcion (cm-1)
+    real(kind=real64), dimension(nreg) :: sigma_s = 0.0  ! Seccion eficaz de dispersion (cm-1)
 
     ! Parametros de la particula
     real(kind=real64), parameter :: xin = 0.0    ! posicion inicial (cm)
@@ -43,7 +44,7 @@ implicit none
     ! parameter to a size of the stack.
     integer(kind=int32), parameter :: nstack = 100  ! maximum number of particles that can hold the stack
     integer(kind=int32) :: np
-    integer(kind=int32), dimension(nstack) :: ir
+    integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
 
     ! Geometrical splitting VRT parameters
@@ -61,8 +62,10 @@ implicit none
                                                                      ! score(1:nreg) : absorcion
                                                                      ! score(nreg+1) : transmision
 
-    real(kind=real64), dimension(0:nreg+1) :: mean_score = 0.0   ! valores promedio
-    real(kind=real64), dimension(0:nreg+1) :: unc_score = 0.0    ! valores de incertidumbre
+    real(kind=real64), dimension(0:nreg+1) :: mean_score = 0.0   ! valores promedio de subregiones
+    real(kind=real64), dimension(0:nreg+1) :: unc_score = 0.0    ! valores de incertidumbre de subregiones
+    real(kind=real64), dimension(0:nreg_o+1) :: mean = 0.0   ! valores promedio
+    real(kind=real64), dimension(0:nreg_o+1) :: unc = 0.0    ! valores de incertidumbre
 
     integer :: case
     integer(kind=int32) :: i, ihist, ibatch     ! contadores de loops
@@ -144,7 +147,7 @@ implicit none
             
             ! Definir flag de particula descartada
             pdisc = .false.
-
+            ! write(*,'(A, I15, A, I15)') 'Batch : ', ibatch, 'History index : ', ihist
             ! Ingresa al proceso de transporte
             particle_loop: do
             
@@ -155,6 +158,7 @@ implicit none
                         ! Vacuum step
                         pstep = 1.0E8
                     else
+                        ! write(*,'(A, I15, I15)') 'Region Index : ', ir(np), np
                         pstep = mfp(sigma_t(ir(np)))
                     endif
 
@@ -228,7 +232,15 @@ implicit none
                             if(rnno .gt. gs_r) then
                                 ! particle does not survive, finish particle
                                 np = np - 1
-                                cycle
+                                
+                                if(np .le. 0) then
+                                    ! Finish particle history.
+                                    exit
+                                else
+                                    ! Start transport of the next particle.
+                                    ! write(*,'(A, I15)') 'np : ', np
+                                    cycle
+                                endif
                             else
                                 ! particle survives, adjusts weight accordingly and continue transport.
                                 wt(np) = (1.0/gs_r)*wt(np)                        
@@ -246,11 +258,12 @@ implicit none
                     score(ir(np)) = score(ir(np)) + wt(np)
                     np = np - 1
                     
-                    if(np .eq. 0) then
+                    if(np .le. 0) then
                         ! Finish particle history.
                         exit
                     else
                         ! Start transport of the next particle.
+                        ! write(*,'(A, I15)') 'np : ', np
                         cycle
                     endif
                 endif
@@ -262,11 +275,12 @@ implicit none
                     score(ir(np)) = score(ir(np)) + wt(np)
                     np = np - 1
 
-                    if(np .eq. 0) then
+                    if(np .le. 0) then
                         ! Finish particle history.
                         exit
                     else
                         ! Start transport of the next particle.
+                        ! write(*,'(A, I15)') 'np : ', np
                         cycle
                     endif
                 else
@@ -286,35 +300,77 @@ implicit none
 
     enddo ibatch_loop
 
+    ! sum_loop: do i = 0,nreg_o+1
+    !     if ()
+    ! enddo sum_loop
+
+    mean(0) = mean_score(0)
+    unc(0) = unc_score(0)
+    mean(nreg_o) = sum(mean_score(1:nreg))
+    unc(nreg_o) = sum(unc_score(1:nreg)) 
+    mean(nreg_o+1) = mean_score(nreg+1)
+    unc(nreg_o+1) = unc_score(nreg+1)
+    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean_score(0), unc_score(0)
+    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', sum(mean_score(1:nreg))/(nbatch*nperbatch), unc(nreg_o)/(nbatch*nperbatch)!sum(unc_score(1:nreg))/(nbatch*nperbatch)
+    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean_score(nreg+1), unc_score(nreg+1)
+
     ! Procesamiento estadistico
-    mean_score = mean_score/nbatch
-    unc_score = (unc_score - nbatch*mean_score**2)/(nbatch-1)
-    unc_score = unc_score/nbatch
-    unc_score = sqrt(unc_score)
+    sum_loop: do i = 0,nreg_o+1
+        mean(i) = mean(i)/nbatch
+        unc(i) = (unc(i) - (nbatch*(mean(i)**2)))/(nbatch-1)
+        unc(i) = unc(i)/nbatch
+        unc(i) = sqrt(unc(i))
+    enddo sum_loop
+    
 
     ! Calcula incertidumbre relativa para calcular FOM
-    unc_score = unc_score/mean_score
+    ! unc = unc/mean
+
+    ! ! Procesamiento estadistico: reflexion
+    ! mean(0) = mean_score(0)/nbatch
+    ! unc(0) = unc_score(0)
+    ! unc(0) = (unc(0) - nbatch*mean(0)**2)/(nbatch-1)
+    ! unc(0) = unc(0)/nbatch
+    ! unc(0) = sqrt(unc(0))
+
+    ! ! Procesamiento estadistico: absorcion
+    ! mean(nreg_o) = sum(mean_score(1:nreg))/nbatch
+    ! unc(nreg_o) = sum(unc_score(1:nreg)) 
+    ! unc(nreg_o) = (unc(nreg_o) - nbatch*mean(nreg_o)**2)/(nbatch-1)
+    ! unc(nreg_o) = unc(nreg_o)/nbatch
+    ! unc(nreg_o) = sqrt(unc(nreg_o))
+
+    ! ! Procesamiento estadistico: transmision
+    ! mean(nreg_o+1) = mean_score(nreg+1)/nbatch
+    ! unc(nreg_o+1) = unc_score(nreg+1)
+    ! unc(nreg_o+1) = (unc(nreg_o+1) - nbatch*mean(nreg_o+1)**2)/(nbatch-1)
+    ! unc(nreg_o+1) = unc(nreg_o+1)/nbatch
+    ! unc(nreg_o+1) = sqrt(unc(nreg_o+1))
+
+    ! ! Calcula incertidumbre relativa para calcular FOM
+    ! unc = unc/mean
 
     ! Imprime resultados en pantalla
-    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
+    ! write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
+    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', 100.0*unc(0), '%'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', sum(mean_score(1:nreg))/nperbatch, ' +/-', & 
-        100.0*sum(unc_score(1:nreg)), '%'
+    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
+        100.0*unc(nreg_o), '%'
     
-    write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean_score(nreg+1)/nperbatch, ' +/-', &
-        100.0*unc_score(nreg+1), '%'
+    write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
+        100.0*unc(nreg_o+1), '%'
 
     ! Obtener tiempo de finalizacion
     call cpu_time(end_time)
     write(*,'(A,F15.5)') 'Elapsed time (s) : ', end_time - start_time
 
     ! Calculo de FOM, precision e incertimbre relativa
-    max_var = maxval(unc_score)
+    max_var = maxval(unc)
     fom = 1.0/(max_var**2*(end_time - start_time))
-    prec = sqrt(max_var)/maxval(mean_score/nperbatch)*100
-    write(*,'(A,F15.5)') 'Mean : ', maxval(mean_score/nperbatch), 'SD : ', sqrt(max_var)
+    prec = sqrt(max_var)/maxval(mean/nperbatch)*100
+    write(*,'(A,F15.5)') 'Mean : ', maxval(mean/nperbatch), 'SD : ', sqrt(max_var)
     write(*,'(A,F15.5)') 'Figure of merit (FOM) : ', fom
     write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', prec/100
     write(*,'(A,F15.5)') 'Precission : ', prec, '%'
