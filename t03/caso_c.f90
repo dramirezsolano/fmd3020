@@ -310,14 +310,14 @@ implicit none
     unc(nreg_o) = sum(unc_score(1:nreg)) 
     mean(nreg_o+1) = mean_score(nreg+1)
     unc(nreg_o+1) = unc_score(nreg+1)
-    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean_score(0), unc_score(0)
-    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', sum(mean_score(1:nreg))/(nbatch*nperbatch), unc(nreg_o)/(nbatch*nperbatch)!sum(unc_score(1:nreg))/(nbatch*nperbatch)
-    ! write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean_score(nreg+1), unc_score(nreg+1)
+    write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean(0), unc(0)
+    write(*,'(A,F20.5,F20.5)') 'Mean y SD : ', (mean(nreg_o)**2)/nbatch, sum(unc_score(1:nreg))
+    write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean(nreg_o+1), unc(nreg_o+1)
 
     ! Procesamiento estadistico
     sum_loop: do i = 0,nreg_o+1
         mean(i) = mean(i)/nbatch
-        unc(i) = (unc(i) - (nbatch*(mean(i)**2)))/(nbatch-1)
+        unc(i) = (unc(i) + (nbatch*(mean(i)*mean(i))))/(nbatch-1) 
         unc(i) = unc(i)/nbatch
         unc(i) = sqrt(unc(i))
     enddo sum_loop
@@ -356,7 +356,7 @@ implicit none
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
+    write(*,'(A,F10.5,A,F20.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
         100.0*unc(nreg_o), '%'
     
     write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &

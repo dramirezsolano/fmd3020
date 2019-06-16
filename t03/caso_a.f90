@@ -217,7 +217,7 @@ implicit none
         score2 = 0.0
 
     enddo ibatch_loop
-
+    write(*,'(A,F20.5,F20.5)') 'Mean y SD : ', (mean_score(1)**2)/nbatch, unc_score(1)!sum(unc_score(1:nreg))/(nbatch*nperbatch)
     ! Procesamiento estadistico
     mean_score = mean_score/nbatch
     unc_score = (unc_score - nbatch*mean_score**2)/(nbatch-1)
