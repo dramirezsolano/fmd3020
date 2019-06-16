@@ -50,7 +50,7 @@ implicit none
     ! Geometrical splitting VRT parameters
     real(kind=real64) :: gs_r = 2.63                ! ratio of region importances.
     integer(kind=int32) :: gs_n                     ! integer part of gs_r
-    real(kind=real64), dimension(nreg) :: gs_i      ! importance of each region
+    real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
     integer(kind=int32), parameter :: nperbatch = 1E6           ! numero de historias por lote
@@ -121,8 +121,8 @@ implicit none
     ! Inicializacion de los datos para la tecnica de Splitting Geometrico:
     ! La importancia aumenta al aumentar el índice de la región para favorecer
     ! la transmision
-    gs_i(1) = gs_r
-    do i = 2,nreg
+    gs_i(0) = gs_r
+    do i = 1,nreg+1
         gs_i(i) = gs_r*gs_i(i-1)            
     enddo
 
