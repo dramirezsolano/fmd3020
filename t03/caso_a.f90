@@ -48,7 +48,7 @@ implicit none
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 
     ! variables de conteo
-    real(kind=real64), dimension(0:nreg+1) :: score, score2 = 0.0    ! score(0) : reflexion
+    real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
                                                                      ! score(1:nreg) : absorcion
                                                                      ! score(nreg+1) : transmision
 
@@ -64,7 +64,6 @@ implicit none
     real(kind=real64) :: rnno 
     real(kind=real64) :: max_var, fom
     real(kind=real64) :: start_time, end_time
-    real(kind=real64) :: prec
 
     write(*,'(A)') '* *********************************** *'
     write(*,'(A)') '* Initializing Monte Carlo Simulation *'
@@ -214,10 +213,9 @@ implicit none
         unc_score = unc_score + score**2
 
         score = 0.0
-        score2 = 0.0
 
     enddo ibatch_loop
-    write(*,'(A,F20.5,F20.5)') 'Mean y SD : ', (mean_score(1)**2)/nbatch, unc_score(1)!sum(unc_score(1:nreg))/(nbatch*nperbatch)
+    
     ! Procesamiento estadistico
     mean_score = mean_score/nbatch
     unc_score = (unc_score - nbatch*mean_score**2)/(nbatch-1)
@@ -245,10 +243,8 @@ implicit none
     ! Calculo de FOM, precision e incertimbre relativa
     max_var = maxval(unc_score)
     fom = 1.0/(max_var**2*(end_time - start_time))
-    prec = sqrt(max_var)/maxval(mean_score/nperbatch)*100
-    write(*,'(A,F15.5)') 'Mean : ', maxval(mean_score/nperbatch), 'SD : ', sqrt(max_var)
     write(*,'(A,F15.5)') 'Figure of merit (FOM) : ', fom
-    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', prec/100
-    write(*,'(A,F15.5)') 'Precission : ', prec, '%'
+    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', max_var
+    write(*,'(A,F15.5)') 'Precission : ', max_var*100, '%'
 
 end program shield_1d

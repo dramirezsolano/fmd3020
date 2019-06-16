@@ -58,12 +58,9 @@ implicit none
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 
     ! variables de conteo
-    real(kind=real64), dimension(0:nreg+1) :: score, score2 = 0.0    ! score(0) : reflexion
-                                                                     ! score(1:nreg) : absorcion
-                                                                     ! score(nreg+1) : transmision
-
-    real(kind=real64), dimension(0:nreg+1) :: mean_score = 0.0   ! valores promedio de subregiones
-    real(kind=real64), dimension(0:nreg+1) :: unc_score = 0.0    ! valores de incertidumbre de subregiones
+    real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
+                                                             ! score(1:nreg) : absorcion
+                                                             ! score(nreg+1) : transmision
     real(kind=real64), dimension(0:nreg_o+1) :: mean = 0.0   ! valores promedio
     real(kind=real64), dimension(0:nreg_o+1) :: unc = 0.0    ! valores de incertidumbre
 
@@ -76,7 +73,6 @@ implicit none
     real(kind=real64) :: rnno 
     real(kind=real64) :: max_var, fom
     real(kind=real64) :: start_time, end_time
-    real(kind=real64) :: prec
 
     write(*,'(A)') '* *********************************** *'
     write(*,'(A)') '* Initializing Monte Carlo Simulation *'
@@ -292,71 +288,35 @@ implicit none
         enddo ihist_loop
 
         ! Acumula resultados y reinicializa el conteo
-        mean_score = mean_score + score
-        unc_score = unc_score + score**2
+        mean(0) = mean(0) + score(0)
+        unc(0) = unc(0) + score(0)**2
+
+        mean(nreg_o) = mean(nreg_o) + sum(score(1:nreg))
+        unc(nreg_o) = unc(nreg_o) + sum(score(1:nreg))**2
+
+        mean(nreg_o+1) = mean(nreg_o+1) + score(nreg+1)
+        unc(nreg_o+1) = unc(nreg_o+1) + score(nreg+1)**2
 
         score = 0.0
-        score2 = 0.0
 
     enddo ibatch_loop
 
-    ! sum_loop: do i = 0,nreg_o+1
-    !     if ()
-    ! enddo sum_loop
-
-    mean(0) = mean_score(0)
-    unc(0) = unc_score(0)
-    mean(nreg_o) = sum(mean_score(1:nreg))
-    unc(nreg_o) = sum(unc_score(1:nreg)) 
-    mean(nreg_o+1) = mean_score(nreg+1)
-    unc(nreg_o+1) = unc_score(nreg+1)
-    write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean(0), unc(0)
-    write(*,'(A,F20.5,F20.5)') 'Mean y SD : ', (mean(nreg_o)**2)/nbatch, sum(unc_score(1:nreg))
-    write(*,'(A,F15.5,F15.5)') 'Mean y SD : ', mean(nreg_o+1), unc(nreg_o+1)
-
     ! Procesamiento estadistico
-    sum_loop: do i = 0,nreg_o+1
-        mean(i) = mean(i)/nbatch
-        unc(i) = (unc(i) + (nbatch*(mean(i)*mean(i))))/(nbatch-1) 
-        unc(i) = unc(i)/nbatch
-        unc(i) = sqrt(unc(i))
-    enddo sum_loop
-    
+    mean = mean/nbatch
+    unc = (unc - nbatch*mean**2)/(nbatch-1) 
+    unc = unc/nbatch
+    unc = sqrt(unc)
 
     ! Calcula incertidumbre relativa para calcular FOM
-    ! unc = unc/mean
-
-    ! ! Procesamiento estadistico: reflexion
-    ! mean(0) = mean_score(0)/nbatch
-    ! unc(0) = unc_score(0)
-    ! unc(0) = (unc(0) - nbatch*mean(0)**2)/(nbatch-1)
-    ! unc(0) = unc(0)/nbatch
-    ! unc(0) = sqrt(unc(0))
-
-    ! ! Procesamiento estadistico: absorcion
-    ! mean(nreg_o) = sum(mean_score(1:nreg))/nbatch
-    ! unc(nreg_o) = sum(unc_score(1:nreg)) 
-    ! unc(nreg_o) = (unc(nreg_o) - nbatch*mean(nreg_o)**2)/(nbatch-1)
-    ! unc(nreg_o) = unc(nreg_o)/nbatch
-    ! unc(nreg_o) = sqrt(unc(nreg_o))
-
-    ! ! Procesamiento estadistico: transmision
-    ! mean(nreg_o+1) = mean_score(nreg+1)/nbatch
-    ! unc(nreg_o+1) = unc_score(nreg+1)
-    ! unc(nreg_o+1) = (unc(nreg_o+1) - nbatch*mean(nreg_o+1)**2)/(nbatch-1)
-    ! unc(nreg_o+1) = unc(nreg_o+1)/nbatch
-    ! unc(nreg_o+1) = sqrt(unc(nreg_o+1))
-
-    ! ! Calcula incertidumbre relativa para calcular FOM
-    ! unc = unc/mean
+    unc = unc/mean
 
     ! Imprime resultados en pantalla
-    ! write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
-    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', 100.0*unc(0), '%'
+    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', &
+        100.0*unc(0), '%'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F20.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
+    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
         100.0*unc(nreg_o), '%'
     
     write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
@@ -369,10 +329,8 @@ implicit none
     ! Calculo de FOM, precision e incertimbre relativa
     max_var = maxval(unc)
     fom = 1.0/(max_var**2*(end_time - start_time))
-    prec = sqrt(max_var)/maxval(mean/nperbatch)*100
-    write(*,'(A,F15.5)') 'Mean : ', maxval(mean/nperbatch), 'SD : ', sqrt(max_var)
     write(*,'(A,F15.5)') 'Figure of merit (FOM) : ', fom
-    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', prec/100
-    write(*,'(A,F15.5)') 'Precission : ', prec, '%'
+    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', max_var
+    write(*,'(A,F15.5)') 'Precission : ', max_var*100, '%'
 
 end program shield_1d
