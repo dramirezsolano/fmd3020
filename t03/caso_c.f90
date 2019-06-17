@@ -42,10 +42,11 @@ implicit none
 
     ! Now we introduce the concept of stack, therefore we expand each particle 
     ! parameter to a size of the stack.
-    integer(kind=int32), parameter :: nstack = 100  ! maximum number of particles that can hold the stack
-    integer(kind=int32) :: np
+    integer(kind=int32), parameter :: nstack = 1000  ! maximum number of particles that can hold the stack
+    integer(kind=int32) :: np, inp
     integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
+    real(kind=real64) :: wt_new
 
     ! Geometrical splitting VRT parameters
     real(kind=real64) :: gs_r = 2.63                ! ratio of region importances.
@@ -53,7 +54,7 @@ implicit none
     real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 1E6           ! numero de historias por lote
+    integer(kind=int32), parameter :: nperbatch = 100000           ! numero de historias por lote
     integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 
@@ -127,7 +128,7 @@ implicit none
     enddo
 
     write(*,'(A)') '(GS VRT ) Importances for each region:'
-    do i = 1,nreg        
+    do i = 0,nreg+1
         write(*,'(A, I3, A, F15.5)') 'nreg = ', i, ', I = ', gs_i(i)
     enddo
     
@@ -205,7 +206,7 @@ implicit none
                     ! Si la particula no ha cambiado de region, interactua
                     if(ir(np) == irnew) then
                         exit
-                    else
+                    else !if(ir(np) .ne. 0 .or. ir(np) .ne. nreg+1) then
                         ! GEOMETRICAL SPLITTING
                         ! Implementation of geometrical splitting VRT.
                         gs_r = gs_i(irnew)/gs_i(ir(np))
@@ -213,14 +214,35 @@ implicit none
                         if(gs_r > 1.0) then
                             ! Particle is going to the ROI. Perform particle splitting.
                             gs_n = floor(gs_r)
+                            ! write(*,'(A, I15)') 'floor(gs_r) : ', gs_n
                             rnno = rng_set()
 
                             if(rnno .le. 1.0 - (gs_r - gs_n)) then
                                 ! Divide the particle in n particles
+                                wt_new = wt(np)/gs_n
+                                np = np - 1
+                                n_split_loop: do inp = 1,gs_n
+                                    np = np + 1
+                                    wt(np) = wt_new
 
+                                    if(np > nstack) then
+                                        write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
+                                        stop
+                                    endif
+                                enddo n_split_loop
                             else
                                 ! Divide the particle in n+1 particles
+                                wt_new = wt(np)/(gs_n+1)
+                                np = np - 1
+                                n1_split_loop: do inp = 1,gs_n+1
+                                    np = np + 1
+                                    wt(np) = wt_new
 
+                                    if(np > nstack) then
+                                        write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
+                                        stop
+                                    endif
+                                enddo n1_split_loop
                             endif
                         else
                             ! Particle is going backwards the ROI. Perform russian roulette.
@@ -241,10 +263,11 @@ implicit none
                                 ! particle survives, adjusts weight accordingly and continue transport.
                                 wt(np) = (1.0/gs_r)*wt(np)                        
                             endif
-                        endif
-                        
+                        endif   
                         ! Update particle region index and continue transport process.
                         ir(np) = irnew
+                    ! else 
+                    !     pdisc = .true.
                     endif
 
                 enddo ptrans_loop 
