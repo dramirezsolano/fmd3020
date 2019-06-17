@@ -46,7 +46,7 @@ implicit none
     integer(kind=int32) :: np, inp
     integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
-    real(kind=real64) :: wt_new
+    real(kind=real64) :: wt_new, x_new, u_new
 
     ! Geometrical splitting VRT parameters
     real(kind=real64) :: gs_r = 2.63                ! ratio of region importances.
@@ -54,7 +54,7 @@ implicit none
     real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 100000           ! numero de historias por lote
+    integer(kind=int32), parameter :: nperbatch = 10000           ! numero de historias por lote
     integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 
@@ -144,7 +144,7 @@ implicit none
             
             ! Definir flag de particula descartada
             pdisc = .false.
-            ! write(*,'(A, I2, A, I2)') 'Batch : ', ibatch, ' History index : ', ihist
+            ! write(*,'(A, I2, A, I10)') 'Batch : ', ibatch, ' History index : ', ihist
             ! Ingresa al proceso de transporte
             particle_loop: do
             
@@ -202,11 +202,13 @@ implicit none
 
                     ! Transporte de la particula
                     x(np) = x(np) + pstep*u(np)
+                    x_new = x(np)
+                    u_new = u(np)
 
                     ! Si la particula no ha cambiado de region, interactua
                     if(ir(np) == irnew) then
                         exit
-                    else !if(ir(np) .ne. 0 .or. ir(np) .ne. nreg+1) then
+                    else if(irnew > 0 .and. irnew < nreg+1) then
                         ! GEOMETRICAL SPLITTING
                         ! Implementation of geometrical splitting VRT.
                         gs_r = gs_i(irnew)/gs_i(ir(np))
@@ -221,9 +223,14 @@ implicit none
                                 ! Divide the particle in n particles
                                 wt_new = wt(np)/gs_n
                                 np = np - 1
+                                ! write(*,'(A, F10.5, A, I3, A, I3, I3)') 'wt_new 1 : ', wt_new, '   np 1 : ', np+1, &
+                                        ! ' region 1 : ', ir(np), irnew
                                 n_split_loop: do inp = 1,gs_n
                                     np = np + 1
                                     wt(np) = wt_new
+                                    ir(np) = irnew
+                                    x(np) =  x_new
+                                    u(np) = u_new
 
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
@@ -234,9 +241,14 @@ implicit none
                                 ! Divide the particle in n+1 particles
                                 wt_new = wt(np)/(gs_n+1)
                                 np = np - 1
+                                ! write(*,'(A, F10.5, A, I3, A, I3, I3)') 'wt_new 2 : ', wt_new, '   np 2 : ', np+1, &
+                                !         ' region 2 : ', ir(np), irnew
                                 n1_split_loop: do inp = 1,gs_n+1
                                     np = np + 1
                                     wt(np) = wt_new
+                                    ir(np) = irnew 
+                                    x(np) =  x_new
+                                    u(np) = u_new
 
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
@@ -264,10 +276,11 @@ implicit none
                                 wt(np) = (1.0/gs_r)*wt(np)                        
                             endif
                         endif   
-                        ! Update particle region index and continue transport process.
-                        ir(np) = irnew
-                    ! else 
-                    !     pdisc = .true.
+                        ! Update particle region index and continue transport process.   
+                        ! ir(np) = irnew                     
+                    else 
+                        ir(np) = irnew                        
+                        pdisc = .true.
                     endif
 
                 enddo ptrans_loop 
@@ -279,6 +292,7 @@ implicit none
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
                     score(ir(np)) = score(ir(np)) + wt(np)
+                    ! write(*,'(A, I2, A, F20.5)') 'Region : ', irnew, ' wt abs o refl : ', wt(np)
                     np = np - 1
                     
                     if(np .eq. 0) then
