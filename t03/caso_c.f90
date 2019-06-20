@@ -42,7 +42,7 @@ implicit none
 
     ! Now we introduce the concept of stack, therefore we expand each particle 
     ! parameter to a size of the stack.
-    integer(kind=int32), parameter :: nstack = 1000  ! maximum number of particles that can hold the stack
+    integer(kind=int32), parameter :: nstack = 100000  ! maximum number of particles that can hold the stack
     integer(kind=int32) :: np, inp
     integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
@@ -54,7 +54,7 @@ implicit none
     real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 10000           ! numero de historias por lote
+    integer(kind=int32), parameter :: nperbatch = 1000000           ! numero de historias por lote
     integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 

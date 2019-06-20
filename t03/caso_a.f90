@@ -43,7 +43,7 @@ implicit none
     real(kind=real64) :: x, u, wt
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 1E6           ! numero de historias por lote
+    integer(kind=int32), parameter :: nperbatch = 100000          ! numero de historias por lote
     integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
     integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
 
