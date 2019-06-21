@@ -43,9 +43,9 @@ implicit none
     real(kind=real64) :: x, u, wt
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 100000          ! numero de historias por lote
-    integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
-    integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
+    integer(kind=int32) :: nperbatch           ! numero de historias por lote
+    integer(kind=int32) :: nbatch = 10               ! numero de lotes estadisticos
+    integer(kind=int32) :: nhist  ! numero de historias total
 
     ! variables de conteo
     real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
@@ -82,6 +82,10 @@ implicit none
         sigma_a = (/1.2/)
         sigma_s = (/0.8/) 
     endif
+
+    write(*,'(A)') 'Set the number of histories per batch: '
+    read(*,*) nperbatch
+    nhist = nbatch*nperbatch
 
     call cpu_time(start_time)
 

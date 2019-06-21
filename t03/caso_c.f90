@@ -42,7 +42,7 @@ implicit none
 
     ! Now we introduce the concept of stack, therefore we expand each particle 
     ! parameter to a size of the stack.
-    integer(kind=int32), parameter :: nstack = 100000  ! maximum number of particles that can hold the stack
+    integer(kind=int32), parameter :: nstack = 1000  ! maximum number of particles that can hold the stack
     integer(kind=int32) :: np, inp
     integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
@@ -54,9 +54,9 @@ implicit none
     real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
 
     ! Parametros de la simulacion
-    integer(kind=int32), parameter :: nperbatch = 1000000           ! numero de historias por lote
-    integer(kind=int32), parameter :: nbatch = 10               ! numero de lotes estadisticos
-    integer(kind=int32), parameter :: nhist = nbatch*nperbatch  ! numero de historias total
+    integer(kind=int32) :: nperbatch           ! numero de historias por lote
+    integer(kind=int32) :: nbatch = 10               ! numero de lotes estadisticos
+    integer(kind=int32) :: nhist  ! numero de historias total
 
     ! variables de conteo
     real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
@@ -92,6 +92,10 @@ implicit none
         sigma_a = (/1.2, 1.2, 1.2, 1.2, 1.2/)
         sigma_s = (/0.8, 0.8, 0.8, 0.8, 0.8/) 
     endif
+
+    write(*,'(A)') 'Set the number of histories per batch: '
+    read(*,*) nperbatch
+    nhist = nbatch*nperbatch
 
     call cpu_time(start_time)
 
@@ -227,14 +231,15 @@ implicit none
                                         ! ' region 1 : ', ir(np), irnew
                                 n_split_loop: do inp = 1,gs_n
                                     np = np + 1
-                                    wt(np) = wt_new
-                                    ir(np) = irnew
-                                    x(np) =  x_new
-                                    u(np) = u_new
-
+                                    
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
                                         stop
+                                    else
+                                        wt(np) = wt_new
+                                        ir(np) = irnew
+                                        x(np) =  x_new
+                                        u(np) = u_new
                                     endif
                                 enddo n_split_loop
                             else
@@ -245,14 +250,15 @@ implicit none
                                 !         ' region 2 : ', ir(np), irnew
                                 n1_split_loop: do inp = 1,gs_n+1
                                     np = np + 1
-                                    wt(np) = wt_new
-                                    ir(np) = irnew 
-                                    x(np) =  x_new
-                                    u(np) = u_new
 
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
                                         stop
+                                    else
+                                        wt(np) = wt_new
+                                        ir(np) = irnew
+                                        x(np) =  x_new
+                                        u(np) = u_new
                                     endif
                                 enddo n1_split_loop
                             endif
