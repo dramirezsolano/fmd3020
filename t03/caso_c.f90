@@ -72,7 +72,7 @@ implicit none
     real(kind=real64) :: pstep                  ! distancia a la siguiente interaccion
     real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
     real(kind=real64) :: rnno 
-    real(kind=real64) :: max_var, fom
+    real(kind=real64) :: fom
     real(kind=real64) :: start_time, end_time
 
     write(*,'(A)') '* *********************************** *'
@@ -282,8 +282,7 @@ implicit none
                                 wt(np) = (1.0/gs_r)*wt(np)                        
                             endif
                         endif   
-                        ! Update particle region index and continue transport process.   
-                        ! ir(np) = irnew                     
+                        ! Update particle region index and continue transport process.                       
                     else 
                         ir(np) = irnew                        
                         pdisc = .true.
@@ -374,10 +373,9 @@ implicit none
     write(*,'(A,F15.5)') 'Elapsed time (s) : ', end_time - start_time
 
     ! Calculo de FOM, precision e incertimbre relativa
-    max_var = maxval(unc)
-    fom = 1.0/(max_var**2*(end_time - start_time))
+    fom = 1.0/(unc(nreg_o+1)**2*(end_time - start_time))
     write(*,'(A,F15.5)') 'Figure of merit (FOM) : ', fom
-    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', max_var
-    write(*,'(A,F15.5)') 'Precission : ', max_var*100, '%'
+    write(*,'(A,F15.5)') 'Relative uncertainty (R) : ', unc(nreg_o+1)
+    write(*,'(A,F15.5)') 'Precission : ', unc(nreg_o+1)*100, '%'
 
 end program shield_1d

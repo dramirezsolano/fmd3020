@@ -40,7 +40,7 @@ implicit none
     integer(kind=int32), parameter :: irin = 1   ! region inicial
 
     integer(kind=int32) :: ir
-    real(kind=real64) :: x, u, wt
+    real(kind=real64) :: x, u, wt, wt_new
 
     ! Parametros de la simulacion
     integer(kind=int32) :: nperbatch           ! numero de historias por lote
@@ -63,6 +63,7 @@ implicit none
     real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
     real(kind=real64) :: rnno 
     real(kind=real64) :: fom
+    real(kind=real64) :: c 
     real(kind=real64) :: start_time, end_time
 
     write(*,'(A)') '* *********************************** *'
@@ -82,6 +83,8 @@ implicit none
         sigma_a = (/1.2/)
         sigma_s = (/0.8/) 
     endif
+    
+    c = 0.5*sigma_t(nreg)
 
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
@@ -133,9 +136,9 @@ implicit none
                     ! Distancia a la siguiente interaccion
                     if(ir == 0 .or. ir == nreg+1) then
                         ! Vacuum step
-                        pstep = 1.0E8
+                        ! pstep = 1.0E8
                     else
-                        pstep = mfp(sigma_t(ir))
+                        pstep = et_mfp(sigma_t(ir),c,u)
                     endif
 
                     ! Guardar la region actual de la particula
@@ -194,6 +197,10 @@ implicit none
             
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
+                    wt_new = (sigma_t(nreg)/(sigma_t(nreg)-(c*u)))*exp(-c*u*pstep)
+                    wt = wt*wt_new
+                    ! write(*,'(A, F10.5, A, F10.5, F10.5, F10.5, F10.5)') 'Weight refl. or trans. : ', wt, ' exp : ', &
+                    !          c, sigma_t(nreg), pstep 
                     score(ir) = score(ir) + wt
                     exit
                 endif
@@ -202,7 +209,10 @@ implicit none
                 rnno = rng_set()
                 if(rnno .le. sigma_a(ir)/sigma_t(ir)) then
                     ! Particula absorbida
+                    wt_new = (sigma_t(nreg)/(sigma_t(nreg)-(c*u)))*exp(-c*u*pstep)
+                    wt = wt*wt_new
                     score(ir) = score(ir) + wt
+                    ! write(*,'(A, F10.5)') 'Weight absorbed : ', wt
                     exit
                 else
                     ! Particula dispersada, reingresa al loop de transporte con la nueva direccion
