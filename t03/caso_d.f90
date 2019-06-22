@@ -6,7 +6,7 @@ program shield_1d
     ! 
     ! mod_rng.f90, mod_scatt.f90 y mod_mfp.f90 no sufrieron modificaciones. Ambos son de (Doerner, 2019)
     !
-    ! Para compilar ejecute: gfortran caso_c.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_c.exe
+    ! Para compilar ejecute: gfortran caso_d.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_d.exe
     ! Para correr ejecute (Linux): ./caso_c.exe
     !                     (Windows): caso_c.exe
     !
@@ -73,6 +73,7 @@ implicit none
     real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
     real(kind=real64) :: rnno 
     real(kind=real64) :: fom
+    real(kind=real64) :: c
     real(kind=real64) :: start_time, end_time
 
     write(*,'(A)') '* *********************************** *'
@@ -92,6 +93,8 @@ implicit none
         sigma_a = (/1.2, 1.2, 1.2, 1.2, 1.2/)
         sigma_s = (/0.8, 0.8, 0.8, 0.8, 0.8/) 
     endif
+
+    c = 0.5*sigma_t(1) ! porque en todas las regiones vale lo mismo
 
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
@@ -160,7 +163,7 @@ implicit none
                         pstep = 1.0E8
                     else
                         ! write(*,'(A, I15, I15)') 'Region Index : ', ir(np), np
-                        pstep = mfp(sigma_t(ir(np)))
+                        pstep = et_mfp(sigma_t(ir(np)),c,u(ir(np)))
                     endif
 
                     ! Guardar la region actual de la particula
@@ -357,15 +360,15 @@ implicit none
     unc = unc/mean
 
     ! Imprime resultados en pantalla
-    write(*,'(A,F15.6,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', &
+    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', &
         100.0*unc(0), '%'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F15.6,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
+    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
         100.0*unc(nreg_o), '%'
     
-    write(*,'(A,F15.6,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
+    write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
         100.0*unc(nreg_o+1), '%'
 
     ! Obtener tiempo de finalizacion

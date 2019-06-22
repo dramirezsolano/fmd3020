@@ -6,7 +6,7 @@ program shield_1d
     ! 
     ! mod_rng.f90, mod_scatt.f90 y mod_mfp.f90 no sufrieron modificaciones. Ambos son de (Doerner, 2019)
     !
-    ! Para compilar ejecute: gfortran caso_a.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_a.exe
+    ! Para compilar ejecute: gfortran caso_b.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_b.exe
     ! Para correr ejecute (Linux): ./caso_a.exe
     !                     (Windows): caso_a.exe
     !
@@ -60,6 +60,7 @@ implicit none
     logical :: pdisc                            ! flag para descartar particula
     integer(kind=int32) :: irnew                ! indice de la region
     real(kind=real64) :: pstep                  ! distancia a la siguiente interaccion
+    real(kind=real64) :: vacuum_pstep
     real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
     real(kind=real64) :: rnno 
     real(kind=real64) :: fom
@@ -84,7 +85,7 @@ implicit none
         sigma_s = (/0.8/) 
     endif
     
-    c = 0.5*sigma_t(nreg)
+    c = 0.08*sigma_t(nreg)
 
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
@@ -136,7 +137,7 @@ implicit none
                     ! Distancia a la siguiente interaccion
                     if(ir == 0 .or. ir == nreg+1) then
                         ! Vacuum step
-                        ! pstep = 1.0E8
+                        pstep = 1.0E8
                     else
                         pstep = et_mfp(sigma_t(ir),c,u)
                     endif
@@ -197,10 +198,11 @@ implicit none
             
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
-                    wt_new = (sigma_t(nreg)/(sigma_t(nreg)-(c*u)))*exp(-c*u*pstep)
+                    ! vacuum_pstep = et_mfp(sigma_t(ir),c,u)
+                    wt_new = (sigma_t(nreg)/(sigma_t(nreg)-(c*u)))*exp(-c*u*xbounds(ir))
                     wt = wt*wt_new
-                    ! write(*,'(A, F10.5, A, F10.5, F10.5, F10.5, F10.5)') 'Weight refl. or trans. : ', wt, ' exp : ', &
-                    !          c, sigma_t(nreg), pstep 
+                    ! write(*,'(A, F10.5, A, F10.5, F10.5, F10.5, F20.5)') 'Weight refl. or trans. : ', wt, ' exp : ', &
+                    !          c, u, pstep 
                     score(ir) = score(ir) + wt
                     exit
                 endif
@@ -240,14 +242,14 @@ implicit none
     unc_score = unc_score/mean_score
 
     ! Imprime resultados en pantalla
-    write(*,'(A,F10.5,A,F10.6,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
+    write(*,'(A,F15.6,A,F10.5,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F10.6,A)') 'Absorption : ', sum(mean_score(1:nreg))/nperbatch, ' +/-', & 
+    write(*,'(A,F15.6,A,F10.5,A)') 'Absorption : ', sum(mean_score(1:nreg))/nperbatch, ' +/-', & 
         100.0*sum(unc_score(1:nreg)), '%'
-    
-    write(*,'(A,F10.5,A,F10.6,A)') 'Transmission : ', mean_score(nreg+1)/nperbatch, ' +/-', &
+
+    write(*,'(A,F15.6,A,F10.5,A)') 'Transmission : ', mean_score(nreg+1)/nperbatch, ' +/-', &
         100.0*unc_score(nreg+1), '%'
 
     ! Obtener tiempo de finalizacion

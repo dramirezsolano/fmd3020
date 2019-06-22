@@ -230,15 +230,22 @@ implicit none
     unc_score = unc_score/mean_score
 
     ! Imprime resultados en pantalla
-    write(*,'(A,F10.5,A,F10.6,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
+    write(*,'(A,F15.6,A,F10.6,A)') 'Reflection : ', mean_score(0)/nperbatch, ' +/-', 100.0*unc_score(0), '%'
+    write(*,'(A,F15.6,A,F10.6,A)') '(', (mean_score(0)/nperbatch)-(unc_score(0)*(mean_score(0)/nperbatch)), ' , ', &
+        (mean_score(0)/nperbatch)+(unc_score(0)*((mean_score(0)/nperbatch))), ')'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F10.6,A)') 'Absorption : ', sum(mean_score(1:nreg))/nperbatch, ' +/-', & 
+    write(*,'(A,F15.6,A,F10.6,A)') 'Absorption : ', sum(mean_score(1:nreg))/nperbatch, ' +/-', & 
         100.0*sum(unc_score(1:nreg)), '%'
+    write(*,'(A,F15.6,A,F10.6,A)') '(', &
+         (sum(mean_score(1:nreg))/nperbatch)-(sum(unc_score(1:nreg))*(sum(mean_score(1:nreg))/nperbatch)), &
+        ' , ', (sum(mean_score(1:nreg))/nperbatch)+(sum(unc_score(1:nreg))*(sum(mean_score(1:nreg))/nperbatch)), ')'
     
-    write(*,'(A,F10.5,A,F10.6,A)') 'Transmission : ', mean_score(nreg+1)/nperbatch, ' +/-', &
+    write(*,'(A,F15.6,A,F10.6,A)') 'Transmission : ', mean_score(nreg+1)/nperbatch, ' +/-', &
         100.0*unc_score(nreg+1), '%'
+    write(*,'(A,F15.6,A,F10.6,A)') '(', (mean_score(nreg+1)/nperbatch)-(unc_score(nreg+1)*(mean_score(nreg+1)/nperbatch)), ' , ', &
+        (mean_score(nreg+1)/nperbatch)+(unc_score(nreg+1)*(mean_score(nreg+1)/nperbatch)), ')'
 
     ! Obtener tiempo de finalizacion
     call cpu_time(end_time)
