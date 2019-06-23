@@ -65,12 +65,11 @@ implicit none
     real(kind=real64), dimension(0:nreg_o+1) :: mean = 0.0   ! valores promedio
     real(kind=real64), dimension(0:nreg_o+1) :: unc = 0.0    ! valores de incertidumbre
 
-    integer :: case
-    integer(kind=int32) :: i, ihist, ibatch     ! contadores de loops
-    logical :: pdisc                            ! flag para descartar particula
-    integer(kind=int32) :: irnew                ! indice de la region
-    real(kind=real64) :: pstep                  ! distancia a la siguiente interaccion
-    real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
+    integer(kind=int32) :: i, ihist, ibatch, case   ! contadores de loops
+    logical :: pdisc                                ! flag para descartar particula
+    integer(kind=int32) :: irnew                    ! indice de la region
+    real(kind=real64) :: pstep                      ! distancia a la siguiente interaccion
+    real(kind=real64) :: dist                       ! distancia al borde en la direccion de la particula
     real(kind=real64) :: rnno 
     real(kind=real64) :: fom
     real(kind=real64) :: c
@@ -94,7 +93,7 @@ implicit none
         sigma_s = (/0.8, 0.8, 0.8, 0.8, 0.8/) 
     endif
 
-    c = 0.5*sigma_t(1) ! porque en todas las regiones vale lo mismo
+    c = 0.08*sigma_t(1) ! porque en todas las regiones vale lo mismo
 
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
@@ -299,7 +298,8 @@ implicit none
 
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
-                    score(ir(np)) = score(ir(np)) + wt(np)
+                    score(ir(np)) = score(ir(np)) + &
+                         (wt(np)*((sigma_t(nreg)/(sigma_t(nreg)-(c*u(np))))*exp(-c*u(np)*xbounds(ir(np)))))
                     ! write(*,'(A, I2, A, F20.5)') 'Region : ', irnew, ' wt abs o refl : ', wt(np)
                     np = np - 1
                     
@@ -318,7 +318,7 @@ implicit none
                 rnno = rng_set()
                 if(rnno .le. sigma_a(ir(np))/sigma_t(ir(np))) then
                     ! Particula absorbida
-                    score(ir(np)) = score(ir(np)) + wt(np)
+                    score(ir(np)) = score(ir(np)) + (wt(np)**((sigma_t(nreg)/(sigma_t(nreg)-(c*u(np))))*exp(-c*u(np)*pstep)))
                     np = np - 1
 
                     if(np .eq. 0) then
@@ -360,15 +360,15 @@ implicit none
     unc = unc/mean
 
     ! Imprime resultados en pantalla
-    write(*,'(A,F10.5,A,F10.5,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', &
+    write(*,'(A,F10.6,A,F10.6,A)') 'Reflection : ', mean(0)/nperbatch, ' +/-', &
         100.0*unc(0), '%'
 
     ! Calcula la incertidumbre de absorcion. Se necesita combinar la incertidumbre de la deposicion en
     ! cada region
-    write(*,'(A,F10.5,A,F10.5,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
+    write(*,'(A,F10.6,A,F10.6,A)') 'Absorption : ', mean(nreg_o)/nperbatch, ' +/-', & 
         100.0*unc(nreg_o), '%'
     
-    write(*,'(A,F10.5,A,F10.5,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
+    write(*,'(A,F10.6,A,F10.6,A)') 'Transmission : ', mean(nreg_o+1)/nperbatch, ' +/-', &
         100.0*unc(nreg_o+1), '%'
 
     ! Obtener tiempo de finalizacion
