@@ -39,40 +39,43 @@ implicit none
     real(kind=real64), parameter :: wtin = 1.0   ! peso estadistico
     integer(kind=int32), parameter :: irin = 1   ! region inicial
 
-    integer(kind=int32) :: ir
-    real(kind=real64) :: x, u, wt
+    integer(kind=int32) :: ir           ! indice de la region
+    real(kind=real64) :: x, u, wt       ! posicion, direccion y peso estadistico, respectivamente
 
     ! Parametros de la simulacion
     integer(kind=int32) :: nperbatch           ! numero de historias por lote
-    integer(kind=int32) :: nbatch = 10               ! numero de lotes estadisticos
-    integer(kind=int32) :: nhist  ! numero de historias total
+    integer(kind=int32) :: nbatch = 10         ! numero de lotes estadisticos
+    integer(kind=int32) :: nhist               ! numero de historias total
 
-    ! variables de conteo
+    ! Variables de conteo
     real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
-                                                                     ! score(1:nreg) : absorcion
-                                                                     ! score(nreg+1) : transmision
+                                                             ! score(1:nreg) : absorcion
+                                                             ! score(nreg+1) : transmision
 
     real(kind=real64), dimension(0:nreg+1) :: mean_score = 0.0   ! valores promedio
     real(kind=real64), dimension(0:nreg+1) :: unc_score = 0.0    ! valores de incertidumbre
 
-    integer :: case
+    integer :: case                             ! almacena el tipo de caso a simular
     integer(kind=int32) :: i, ihist, ibatch     ! contadores de loops
     logical :: pdisc                            ! flag para descartar particula
     integer(kind=int32) :: irnew                ! indice de la region
     real(kind=real64) :: pstep                  ! distancia a la siguiente interaccion
     real(kind=real64) :: dist                   ! distancia al borde en la direccion de la particula
-    real(kind=real64) :: rnno 
-    real(kind=real64) :: fom
+    real(kind=real64) :: rnno                   ! numero aleatorio
+    real(kind=real64) :: fom                    ! figura de merito
     real(kind=real64) :: start_time, end_time
 
     write(*,'(A)') '* *********************************** *'
     write(*,'(A)') '* Initializing Monte Carlo Simulation *'
     write(*,'(A)') '* *********************************** *'
     write(*,'(A)') 'This software estimates the probability of absorption, transmission and reflection'
+    write(*,'(A)') ''
     write(*,'(A)') 'Case 1: Total cross section = 2.0 cm-1, Scatter cross section = 0.2 cm-1, d = 5.0 cm, theta = 0.0'
     write(*,'(A)') 'Case 2: Total cross section = 2.0 cm-1, Scatter cross section = 0.8 cm-1, d = 5.0 cm, theta = 0.0'
+    write(*,'(A)') ''
     write(*,'(A)') 'Type 1 for case 1 or 2 for case 2: '
     read(*,*) case
+
     if(case == 1) then
         ! Caso 1)
         sigma_a = (/1.8/)  ! Seccion eficaz de absorcion (cm-1)
@@ -83,6 +86,8 @@ implicit none
         sigma_s = (/0.8/) 
     endif
 
+    write(*,'(A)') ''
+    ! Asignacion del numero de historias por batch a traves del teclado
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
     nhist = nbatch*nperbatch

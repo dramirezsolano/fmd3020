@@ -2,13 +2,15 @@ program shield_1d
     !
     ! Programa para estimar la precisión y la figura de mérito (FOM) asociadas a
     ! la probabilidad de transmisión, reflexión y absorción de partículas
-    ! que atraviesan un atenuador de una dimensión para dos casos diferentes.
+    ! que atraviesan un atenuador de una dimensión para dos casos diferentes. En
+    ! este algoritmo se han implementado las tecnicas Transformacion Exponencial (ET)
+    ! y "Geometrical Splitting" como Tecnicas de Reduccion de Varianza (VRT).
     ! 
     ! mod_rng.f90, mod_scatt.f90 y mod_mfp.f90 no sufrieron modificaciones. Ambos son de (Doerner, 2019)
     !
     ! Para compilar ejecute: gfortran caso_d.f90 mod_rng.f90 mod_mfp.f90 mod_scatt.f90 -o caso_d.exe
-    ! Para correr ejecute (Linux): ./caso_c.exe
-    !                     (Windows): caso_c.exe
+    ! Para correr ejecute (Linux): ./caso_d.exe
+    !                     (Windows): caso_d.exe
     !
     ! Autores: Jessica Hernández
     !          Daniel Ramirez
@@ -24,8 +26,8 @@ program shield_1d
 implicit none
 
     ! Parametros geometricos
-    integer(kind=int32), parameter :: nreg_o = 1          ! numero de regiones
-    integer(kind=int32), parameter :: nreg = 5            ! numero de subregiones
+    integer(kind=int32), parameter :: nreg_o = 1          ! numero de regiones originales
+    integer(kind=int32), parameter :: nreg = 5            ! numero de subregiones (GS)
     real(kind=real64), dimension(nreg) :: xthick = 1.0    ! grosor del atenuador 1D (cm)
     real(kind=real64), dimension(nreg+1) :: xbounds = 0.0 ! fronteras de la region (cm)
 
@@ -40,23 +42,22 @@ implicit none
     real(kind=real64), parameter :: wtin = 1.0   ! peso estadistico
     integer(kind=int32), parameter :: irin = 1   ! region inicial
 
-    ! Now we introduce the concept of stack, therefore we expand each particle 
-    ! parameter to a size of the stack.
-    integer(kind=int32), parameter :: nstack = 1000  ! maximum number of particles that can hold the stack
+    ! Introduccion del concepto de stack
+    integer(kind=int32), parameter :: nstack = 1000  ! numero maximo de particulas que puede almacenar el stack
     integer(kind=int32) :: np, inp
     integer(kind=int32), dimension(nstack) :: ir = 0
     real(kind=real64), dimension(nstack) :: x, u, wt
     real(kind=real64) :: wt_new, x_new, u_new
 
-    ! Geometrical splitting VRT parameters
-    real(kind=real64) :: gs_r = 2.63                ! ratio of region importances.
-    integer(kind=int32) :: gs_n                     ! integer part of gs_r
-    real(kind=real64), dimension(0:nreg+1) :: gs_i      ! importance of each region
+    ! Parametros de la tecnica "Geometrical Splitting"
+    real(kind=real64) :: gs_r = 2.63                ! razon entre las importancias de las regiones
+    integer(kind=int32) :: gs_n                     ! parte entera de gs_r
+    real(kind=real64), dimension(0:nreg+1) :: gs_i  ! importancia de cada region
 
     ! Parametros de la simulacion
     integer(kind=int32) :: nperbatch           ! numero de historias por lote
-    integer(kind=int32) :: nbatch = 10               ! numero de lotes estadisticos
-    integer(kind=int32) :: nhist  ! numero de historias total
+    integer(kind=int32) :: nbatch = 10         ! numero de lotes estadisticos
+    integer(kind=int32) :: nhist               ! numero de historias total
 
     ! variables de conteo
     real(kind=real64), dimension(0:nreg+1) :: score = 0.0    ! score(0) : reflexion
@@ -65,7 +66,8 @@ implicit none
     real(kind=real64), dimension(0:nreg_o+1) :: mean = 0.0   ! valores promedio
     real(kind=real64), dimension(0:nreg_o+1) :: unc = 0.0    ! valores de incertidumbre
 
-    integer(kind=int32) :: i, ihist, ibatch, case   ! contadores de loops
+    integer :: case                                 ! almacena el tipo de caso a simular
+    integer(kind=int32) :: i, ihist, ibatch         ! contadores de loops
     logical :: pdisc                                ! flag para descartar particula
     integer(kind=int32) :: irnew                    ! indice de la region
     real(kind=real64) :: pstep                      ! distancia a la siguiente interaccion
@@ -79,10 +81,14 @@ implicit none
     write(*,'(A)') '* Initializing Monte Carlo Simulation *'
     write(*,'(A)') '* *********************************** *'
     write(*,'(A)') 'This software estimates the probability of absorption, transmission and reflection'
+    write(*,'(A)') 'through -> GEOMETRICAL SPLITTING & EXPONENTIAL TRANSFORM <- as a Variance Reduction Techniques.'
+    write(*,'(A)') ''
     write(*,'(A)') 'Case 1: Total cross section = 2.0 cm-1, Scatter cross section = 0.2 cm-1, d = 5.0 cm, theta = 0.0'
     write(*,'(A)') 'Case 2: Total cross section = 2.0 cm-1, Scatter cross section = 0.8 cm-1, d = 5.0 cm, theta = 0.0'
+    write(*,'(A)') ''
     write(*,'(A)') 'Type 1 for case 1 or 2 for case 2: '
     read(*,*) case
+
     if(case == 1) then
         ! Caso 1)
         sigma_a = (/1.8, 1.8, 1.8, 1.8, 1.8/)  ! Seccion eficaz de absorcion (cm-1)
@@ -93,8 +99,9 @@ implicit none
         sigma_s = (/0.8, 0.8, 0.8, 0.8, 0.8/) 
     endif
 
-    c = 0.08*sigma_t(1) ! porque en todas las regiones vale lo mismo
+    c = 0.08*sigma_t(1) ! se evalua en 1 ya que en todas las regiones sigma vale lo mismo
 
+    write(*,'(A)') ''
     write(*,'(A)') 'Set the number of histories per batch: '
     read(*,*) nperbatch
     nhist = nbatch*nperbatch
@@ -150,7 +157,7 @@ implicit none
             
             ! Definir flag de particula descartada
             pdisc = .false.
-            ! write(*,'(A, I2, A, I10)') 'Batch : ', ibatch, ' History index : ', ihist
+
             ! Ingresa al proceso de transporte
             particle_loop: do
             
@@ -161,8 +168,7 @@ implicit none
                         ! Vacuum step
                         pstep = 1.0E8
                     else
-                        ! write(*,'(A, I15, I15)') 'Region Index : ', ir(np), np
-                        pstep = et_mfp(sigma_t(ir(np)),c,u(ir(np)))
+                        pstep = et_mfp(sigma_t(ir(np)),c,u(ir(np))) ! mfp calculado a traves del pdf modificado
                     endif
 
                     ! Guardar la region actual de la particula
@@ -215,29 +221,28 @@ implicit none
                     if(ir(np) == irnew) then
                         exit
                     else if(irnew > 0 .and. irnew < nreg+1) then
-                        ! GEOMETRICAL SPLITTING
-                        ! Implementation of geometrical splitting VRT.
+                        ! Implementacion del GS
                         gs_r = gs_i(irnew)/gs_i(ir(np))
 
                         if(gs_r > 1.0) then
-                            ! Particle is going to the ROI. Perform particle splitting.
+                            ! Particula se dirige a la ROI, realiza splitting
                             gs_n = floor(gs_r)
-                            ! write(*,'(A, I15)') 'floor(gs_r) : ', gs_n
                             rnno = rng_set()
 
                             if(rnno .le. 1.0 - (gs_r - gs_n)) then
-                                ! Divide the particle in n particles
+                                ! Divide la particula en n particulas
                                 wt_new = wt(np)/gs_n
                                 np = np - 1
-                                ! write(*,'(A, F10.5, A, I3, A, I3, I3)') 'wt_new 1 : ', wt_new, '   np 1 : ', np+1, &
-                                        ! ' region 1 : ', ir(np), irnew
+
                                 n_split_loop: do inp = 1,gs_n
                                     np = np + 1
                                     
+                                    ! Verifica si se ha excedido el stack y cierra el programa
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
                                         stop
                                     else
+                                        ! Actualizacion de los parametros de la particula
                                         wt(np) = wt_new
                                         ir(np) = irnew
                                         x(np) =  x_new
@@ -245,18 +250,19 @@ implicit none
                                     endif
                                 enddo n_split_loop
                             else
-                                ! Divide the particle in n+1 particles
+                                ! Divide la particula en n+1 particulas
                                 wt_new = wt(np)/(gs_n+1)
                                 np = np - 1
-                                ! write(*,'(A, F10.5, A, I3, A, I3, I3)') 'wt_new 2 : ', wt_new, '   np 2 : ', np+1, &
-                                !         ' region 2 : ', ir(np), irnew
+
                                 n1_split_loop: do inp = 1,gs_n+1
                                     np = np + 1
 
+                                    ! Verifica si se ha excedido el stack y cierra el programa
                                     if(np > nstack) then
                                         write(*,'(A)') 'WARNING: Stack overfloated! -> Aborting the simulation!'
                                         stop
                                     else
+                                        ! Actualizacion de los parametros de la particula
                                         wt(np) = wt_new
                                         ir(np) = irnew
                                         x(np) =  x_new
@@ -265,27 +271,27 @@ implicit none
                                 enddo n1_split_loop
                             endif
                         else
-                            ! Particle is going backwards the ROI. Perform russian roulette.
+                            ! La particula se aleja de la ROI. Aplica Ruleta Rusa
                             rnno = rng_set()
                             if(rnno .gt. gs_r) then
-                                ! particle does not survive, finish particle
+                                ! Particula no sobrevive, finaliza su historia
                                 np = np - 1
                                 
                                 if(np .eq. 0) then
-                                    ! Finish particle history.
-                                    ! write(*,'(A, I15)') 'np ptrans_loop : ', np
+                                    ! Finaliza la historia de la particula
                                     exit
                                 else
-                                    ! Start transport of the next particle.
+                                    ! Inicia el transporte de la siguiente particula
                                     cycle
                                 endif
                             else
-                                ! particle survives, adjusts weight accordingly and continue transport.
+                                ! Particula sobrevive, ajusta el peso y continua el proceso
                                 wt(np) = (1.0/gs_r)*wt(np)                        
                             endif
-                        endif   
-                        ! Update particle region index and continue transport process.                       
+                        endif                          
                     else 
+                        ! Actualiza la region y descarta la particula ya que se 
+                        ! encuentra fuera de la geometria
                         ir(np) = irnew                        
                         pdisc = .true.
                     endif
@@ -298,18 +304,16 @@ implicit none
 
                 if(pdisc .eqv. .true.) then
                     ! Particula descartada. Se cuenta y se detiene el rastreo
+                    ! Se modifica el peso segun la tecnica ET
                     score(ir(np)) = score(ir(np)) + &
                          (wt(np)*((sigma_t(nreg)/(sigma_t(nreg)-(c*u(np))))*exp(-c*u(np)*xbounds(ir(np)))))
-                    ! write(*,'(A, I2, A, F20.5)') 'Region : ', irnew, ' wt abs o refl : ', wt(np)
                     np = np - 1
                     
                     if(np .eq. 0) then
-                        ! Finish particle history.
-                        ! write(*,'(A, I15)') 'np fuera : ', np
+                        ! Finaliza la historia de la particula
                         exit
                     else
-                        ! Start transport of the next particle.
-                        ! write(*,'(A, I15)') 'np : ', np
+                        ! Inicia el transporte de la siguiente particula
                         cycle
                     endif
                 endif
@@ -318,14 +322,15 @@ implicit none
                 rnno = rng_set()
                 if(rnno .le. sigma_a(ir(np))/sigma_t(ir(np))) then
                     ! Particula absorbida
+                    ! Se modifica el peso segun la tecnica ET
                     score(ir(np)) = score(ir(np)) + (wt(np)**((sigma_t(nreg)/(sigma_t(nreg)-(c*u(np))))*exp(-c*u(np)*pstep)))
                     np = np - 1
 
                     if(np .eq. 0) then
-                        ! Finish particle history.
+                        ! Finaliza la historia de la particula
                         exit
                     else
-                        ! Start transport of the next particle.
+                        ! Inicia el transporte de la siguiente particula
                         cycle
                     endif
                 else
